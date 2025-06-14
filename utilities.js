@@ -1,21 +1,21 @@
-function initVehicleSelector() {
-    // Field names for data navigation
-    const fieldNames = [
-        "year",
-        "make",
-        "model",
-        "submodel",
-        "chassis",
-        "engine",
-        "transmission"
-    ];
+function initVehicleSelector(config = {}) {
+    // Configuration with defaults
+    const {
+        formId = "vehicle-selector-form",
+        dropdownId = "vehicle-selector-dropdown", 
+        summaryId = "vehicle-selector-summary",
+        fieldNames = ["year", "make", "model", "submodel", "chassis", "engine", "transmission"],
+        onComplete = null, // Callback function when vehicle configuration is complete
+        onReset = null, // Callback function when vehicle selector is reset
+        vehicleData = window.carData || {}
+    } = config;
 
     // Cache all DOM elements once at initialization - Performance optimization
     const elements = {
-        form: document.getElementById("vehicle-selector-form"),
-        dropdown: document.getElementById("vehicle-selector-dropdown"),
+        form: document.getElementById(formId),
+        dropdown: document.getElementById(dropdownId),
         dropdownBox: null, // Will be set after dropdown check
-        summaryElement: document.getElementById("vehicle-selector-summary"),
+        summaryElement: document.getElementById(summaryId),
         questionSets: document.querySelectorAll(
             ".vehicle-selector-questions-set"
         ),
@@ -43,9 +43,6 @@ function initVehicleSelector() {
     let currentQuestionSet = 0;
     let debounceTimer = null;
     let focusTimer = null;
-
-    // Vehicle data - assumed to be available globally
-    const vehicleData = window.carData || {};
 
     // Initialize the selector
     function initialize() {
@@ -683,37 +680,41 @@ function initVehicleSelector() {
         clearFieldAndSubsequent(fromIndex + 1);
     }
 
-    // Handle reset selection clicks - reset entire selector without triggering onComplete
-    function handleResetSelection(event) {
+    // Handle reset selection clicks - reset entire selector and trigger onReset callback
+    function handleResetSelection(event, skipCallback = false) {
         event.preventDefault();
+        
+        // Store previous values before clearing (for callback)
+        const previousValues = { ...selectedValues };
+        const wasPreviouslyComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
         
         // Clear all selected values
         selectedValues = {};
         
         // Clear summary
         if (elements.summaryElement) {
-        elements.summaryElement.textContent = "";
+            elements.summaryElement.textContent = "";
         }
         
         // Reset all input fields
         elements.inputs.forEach((input, index) => {
-        if (!input) return;
-        
-        input.value = "";
-        const group = input.closest(".vehicle-selector-input-group");
-        if (group) {
-            group.classList.remove("completed", "active");
-            if (index === 0) {
-            // First field should be active
-            group.classList.remove("disabled");
-            group.classList.add("active");
-            input.disabled = false;
-            } else {
-            // All other fields should be disabled
-            group.classList.add("disabled");
-            input.disabled = true;
+            if (!input) return;
+            
+            input.value = "";
+            const group = input.closest(".vehicle-selector-input-group");
+            if (group) {
+                group.classList.remove("completed", "active");
+                if (index === 0) {
+                    // First field should be active
+                    group.classList.remove("disabled");
+                    group.classList.add("active");
+                    input.disabled = false;
+                } else {
+                    // All other fields should be disabled
+                    group.classList.add("disabled");
+                    input.disabled = true;
+                }
             }
-        }
         });
         
         // Hide dropdown and puck
@@ -725,22 +726,36 @@ function initVehicleSelector() {
         currentFieldIndex = 0;
         
         elements.questionSets.forEach((set, index) => {
-        if (index === 0) {
-            set.classList.remove("hidden");
-        } else {
-            set.classList.add("hidden");
-        }
+            if (index === 0) {
+                set.classList.remove("hidden");
+            } else {
+                set.classList.add("hidden");
+            }
         });
         
         // Focus on the first field
         if (elements.inputs[0]) {
-        elements.inputs[0].focus();
-        showDropdownForField(0);
-        updatePuck(0);
+            elements.inputs[0].focus();
+            showDropdownForField(0);
+            updatePuck(0);
         }
         
         // Update navigation arrows
         updateNavigationArrows();
+        
+        // Trigger onReset callback if configured and not skipped
+        if (typeof onReset === 'function' && !skipCallback && wasPreviouslyComplete) {
+            try {
+                onReset({
+                    previousValues: previousValues,
+                    previousSummary: fieldNames.map(fieldName => previousValues[fieldName]).filter(Boolean).join(", "),
+                    resetBy: 'button', // Indicates this was triggered by the reset button
+                    getState: () => ({ ...selectedValues })
+                });
+            } catch (error) {
+                console.error('Error in vehicle selector reset callback:', error);
+            }
+        }
         
         console.log('Vehicle selector reset to initial state');
     }
@@ -834,7 +849,7 @@ function initVehicleSelector() {
     // Generate summary of all selections and handle completion
     function generateSummary(skipOnComplete = false) {
         if (!elements.summaryElement) return;
-    
+
         const parts = fieldNames.map(fieldName => selectedValues[fieldName]).filter(Boolean);
         elements.summaryElement.textContent = parts.join(", ");
         
@@ -842,20 +857,19 @@ function initVehicleSelector() {
         const isComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
         
         if (isComplete && typeof onComplete === 'function' && !skipOnComplete) {
-        // Call the completion callback with the selected values
-        try {
-            onComplete({
-            values: { ...selectedValues },
-            summary: parts.join(", "),
-            reset: () => handleResetSelection({ preventDefault: () => {} }), // Provide reset function
-            getState: () => ({ ...selectedValues })
-            });
-        } catch (error) {
-            console.error('Error in vehicle selector completion callback:', error);
-        }
+            // Call the completion callback with the selected values
+            try {
+                onComplete({
+                    values: { ...selectedValues },
+                    summary: parts.join(", "),
+                    reset: () => handleResetSelection({ preventDefault: () => {} }), // Provide reset function
+                    getState: () => ({ ...selectedValues })
+                });
+            } catch (error) {
+                console.error('Error in vehicle selector completion callback:', error);
+            }
         }
     }
-
     // Handle clicks outside dropdown
     function handleOutsideClick(event) {
         if (
@@ -952,7 +966,7 @@ function initVehicleSelector() {
             cleanup.clearTimers();
             selectedValues = {};
         },
-        reset: () => handleResetSelection({ preventDefault: () => { } }), // Public reset method
+        reset: (skipCallback = false) => handleResetSelection({ preventDefault: () => {} }, skipCallback), // Public reset method
         setupInitialState: setupInitialState, // Keep original for backward compatibility
         getState: () => ({ ...selectedValues }),
         getConfig: () => ({ formId, dropdownId, summaryId, fieldNames }),
