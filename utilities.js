@@ -19,7 +19,8 @@ function initVehicleSelector(config = {}) {
         compatibleVehicles = [],
         buttonVisibility = "always",
         buttonUrlRef = "",
-        buttonUrlCategory = ""
+        buttonUrlCategory = "",
+        urlContext = "default"
     } = customActions;
 
     // Cache all DOM elements once at initialization - Performance optimization
@@ -1136,7 +1137,7 @@ function initVehicleSelector(config = {}) {
 
     function generateRedirectURL(vehicleConfig) {
         const { year, make, model, submodel, chassis, engine, transmission } = vehicleConfig;
-
+        
         // Validate minimum requirements
         if (!year || !make || !model) {
             const error = 'Cannot generate redirect URL: Year, Make, and Model are required';
@@ -1146,41 +1147,85 @@ function initVehicleSelector(config = {}) {
             }
             return null;
         }
-
-        // Helper function to encode URL segments
-        function encodeUrlSegment(str) {
-            return encodeURIComponent(str)
-                .replace(/%20/g, '-')           // Replace %20 (space) with hyphen
-                .replace(/[()]/g, '')           // Remove parentheses
-                .replace(/[,&]/g, '-')          // Replace commas and ampersands with hyphens
-                .replace(/-+/g, '-')            // Replace multiple consecutive hyphens with single hyphen
-                .replace(/^-|-$/g, '')          // Remove leading/trailing hyphens
-                .toLowerCase();
+        
+        try {
+            // Find the vehicle in our data to get the redirect URL
+            const yearData = vehicleData[year];
+            if (!yearData) throw new Error(`Year ${year} not found in vehicle data`);
+            
+            const makeData = yearData[make];
+            if (!makeData) throw new Error(`Make ${make} not found for year ${year}`);
+            
+            const modelData = makeData[model];
+            if (!modelData) throw new Error(`Model ${model} not found for ${year} ${make}`);
+            
+            // Look for redirectUrls - first check at submodel level, then model level
+            let redirectUrls = modelData.redirectUrls;
+            
+            if (submodel && modelData[submodel] && modelData[submodel].redirectUrls) {
+                // Use more specific submodel URLs if available
+                redirectUrls = { ...redirectUrls, ...modelData[submodel].redirectUrls };
+            }
+            
+            if (!redirectUrls) {
+                throw new Error(`No redirect URLs found for ${year} ${make} ${model}`);
+            }
+            
+            // Get the appropriate URL based on context
+            const urlContext = customActions.urlContext || 'default';
+            let baseUrl = redirectUrls[urlContext] || redirectUrls.default;
+            
+            if (!baseUrl) {
+                throw new Error(`No URL found for context '${urlContext}' in ${year} ${make} ${model}`);
+            }
+            
+            // Ensure baseUrl ends with /
+            if (!baseUrl.endsWith('/')) {
+                baseUrl += '/';
+            }
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            
+            // Add vehicle params (skip "I don't know" values)
+            if (year && year !== "I don't know") params.append('year', year);
+            if (submodel && submodel !== "I don't know") params.append('submodel', submodel);
+            if (chassis && chassis !== "I don't know") params.append('chassis', chassis);
+            if (engine && engine !== "I don't know") params.append('engine', engine);
+            if (transmission && transmission !== "I don't know") params.append('transmission', transmission);
+            
+            // Add custom parameters
+            if (buttonUrlRef) {
+                // Handle both simple strings and URL-encoded parameters
+                if (buttonUrlRef.includes('=')) {
+                    // Parse existing parameters and add them
+                    const refParams = new URLSearchParams(buttonUrlRef);
+                    refParams.forEach((value, key) => {
+                        params.append(key, value);
+                    });
+                } else {
+                    // Simple ref parameter
+                    params.append('ref', buttonUrlRef);
+                }
+            }
+            
+            // Combine URL and parameters
+            const queryString = params.toString();
+            return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+            
+        } catch (error) {
+            const errorMessage = `URL generation failed: ${error.message}`;
+            console.error(errorMessage);
+            if (typeof onError === 'function') {
+                onError({ 
+                    type: 'url_generation', 
+                    message: errorMessage, 
+                    config: vehicleConfig,
+                    originalError: error 
+                });
+            }
+            return null;
         }
-
-        // Build base URL with encoded segments
-        let baseUrl = `/parts/${encodeUrlSegment(make)}/${encodeUrlSegment(model)}`;
-        if (buttonUrlCategory) {
-            baseUrl += `/${encodeUrlSegment(buttonUrlCategory)}`;
-        }
-        baseUrl += '/';
-
-        // Build query parameters
-        const params = new URLSearchParams();
-
-        // Add vehicle params (skip "I don't know" values)
-        if (year && year !== "I don't know") params.append('year', year);
-        if (submodel && submodel !== "I don't know") params.append('submodel', submodel);
-        if (chassis && chassis !== "I don't know") params.append('chassis', chassis);
-        if (engine && engine !== "I don't know") params.append('engine', engine);
-        if (transmission && transmission !== "I don't know") params.append('transmission', transmission);
-
-        // Add custom ref parameter
-        if (buttonUrlRef) params.append('ref', buttonUrlRef);
-
-        // Combine URL and parameters
-        const queryString = params.toString();
-        return queryString ? `${baseUrl}?${queryString}` : baseUrl;
     }
 
     function getVehicleMatchType(vehicleConfig) {
@@ -1300,7 +1345,18 @@ function initVehicleSelector(config = {}) {
         },
         setConfiguration: setVehicleConfiguration,
         updateButtonConfig: (newConfig) => {
+            // Update the customActions object
             Object.assign(customActions, newConfig);
+            
+            // Update extracted variables
+            if (newConfig.buttonText !== undefined) buttonText = newConfig.buttonText;
+            if (newConfig.compatibleVehicles !== undefined) compatibleVehicles = newConfig.compatibleVehicles;
+            if (newConfig.buttonVisibility !== undefined) buttonVisibility = newConfig.buttonVisibility;
+            if (newConfig.buttonUrlRef !== undefined) buttonUrlRef = newConfig.buttonUrlRef;
+            if (newConfig.buttonUrlCategory !== undefined) buttonUrlCategory = newConfig.buttonUrlCategory;
+            if (newConfig.urlContext !== undefined) urlContext = newConfig.urlContext;
+            
+            // Re-evaluate button state with new config
             const isComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
             if (isComplete) {
                 const redirectURL = generateRedirectURL(selectedValues);

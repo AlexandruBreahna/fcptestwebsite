@@ -1,6 +1,6 @@
 # Vehicle Selector
 
-A JavaScript component that creates an interactive, step-by-step vehicle configuration wizard. Users can select their vehicle details through an intuitive interface with autocomplete dropdowns and smooth transitions.
+A JavaScript component that creates an interactive, step-by-step vehicle configuration wizard. Users can select their vehicle details through an intuitive interface with autocomplete dropdowns, smooth transitions, and smart action buttons.
 
 ## Features
 
@@ -9,6 +9,9 @@ A JavaScript component that creates an interactive, step-by-step vehicle configu
 - ⌨️ **Keyboard navigation** (arrows, enter, escape)
 - 🎨 **Smooth animations** with visual puck indicator
 - 🔄 **Programmatic control** (reset, set configuration)
+- 🎛️ **Smart action buttons** with vehicle compatibility detection
+- 📊 **Match detection** (perfect, partial, none) for page compatibility
+- 🔗 **Auto-generated URLs** with proper encoding and parameters
 - 📱 **Responsive design** ready
 - ⚡ **Performance optimized** with event delegation
 
@@ -47,7 +50,9 @@ A JavaScript component that creates an interactive, step-by-step vehicle configu
         <div class="vehicle-selector-step hidden">
             <div class="vehicle-selector-step-content">
                 <div class="vehicle-selector-puck"></div>
-                <a href="#" class="vehicle-selector-nav-arrow nav-backwards">← Back</a>
+                <a href="#" class="vehicle-selector-nav-arrow nav-backwards">
+                    <div id="vehicle-selector-intermediary-summary">Year, Make, Model and Submodel</div>
+                </a>
 
                 <!-- Add Chassis, Engine, Transmission fields -->
 
@@ -61,7 +66,7 @@ A JavaScript component that creates an interactive, step-by-step vehicle configu
                 <a href="#" class="vehicle-selector-nav-arrow nav-backwards">← Back</a>
 
                 <div class="vehicle-selector-summary">
-                    <div id="vehicle-selector-summary">Your selection will appear here</div>
+                    <div id="vehicle-selector-complete-summary">Your complete selection will appear here</div>
                 </div>
 
                 <button class="vehicle-selector-reset-selection">Start Over</button>
@@ -95,9 +100,9 @@ const carData = {
       }
     },
     Audi: {
-      "A4": {
-        "Premium": {
-          "4-door Sedan": {
+      "A5 Sportback": {
+        "Premium Plus": {
+          "4-door Sportback": {
             "Petrol 2.0L TFSI": ["7-speed S tronic"]
           }
         }
@@ -112,9 +117,14 @@ const carData = {
 ```javascript
 const vehicleSelector = initVehicleSelector({
   vehicleData: carData,
+  customActions: {
+    buttonText: "Browse Parts",
+    buttonVisibility: "always"
+  },
   onComplete: (result) => {
     console.log('Vehicle selected:', result.summary);
-    // Redirect to parts page or save selection
+    console.log('Redirect URL:', result.redirectURL);
+    console.log('Match type:', result.matchType);
   }
 });
 ```
@@ -125,70 +135,115 @@ const vehicleSelector = initVehicleSelector({
 |--------|------|---------|-------------|
 | `formId` | string | `"vehicle-selector-form"` | ID of the form element |
 | `dropdownId` | string | `"vehicle-selector-dropdown"` | ID of the dropdown element |
-| `intermediarySummaryId` | string | `"vehicle-selector-intermediary-summary"` | Intermediary ID of the summary element |
-| `summaryId` | string | `"vehicle-selector-complete-summary"` | ID of the summary element |
+| `summaryId` | string | `"vehicle-selector-complete-summary"` | ID of the complete summary element |
+| `intermediarySummaryId` | string | `"vehicle-selector-intermediary-summary"` | ID of the intermediary summary element |
 | `fieldNames` | array | `["year", "make", "model", ...]` | Names of the input fields |
 | `vehicleData` | object | `window.carData \|\| {}` | Vehicle data object |
 | `onComplete` | function | `null` | Callback when all fields are filled |
 | `onReset` | function | `null` | Callback when selector is reset |
+| `onError` | function | `null` | Callback when errors occur |
+| `customActions` | object | `{}` | Action button configuration |
+
+### Custom Actions Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `buttonText` | string | `"Browse Parts"` | Text displayed on the action button |
+| `compatibleVehicles` | array | `[]` | Array of vehicles compatible with current page |
+| `buttonVisibility` | string | `"always"` | Button visibility: `"always"`, `"never"`, `"compatibility"` |
+| `buttonUrlRef` | string | `""` | Query parameter for tracking (e.g., `"utm_source=selector"`) |
+| `buttonUrlCategory` | string | `""` | Page category to append to URL (e.g., `"braking-system"`) |
 
 ## Examples
 
-### Basic Setup
+### Homepage Setup (Always Show Button)
 
 ```javascript
 const selector = initVehicleSelector({
   vehicleData: carData,
-  onComplete: (result) => {
-    alert(`Selected: ${result.summary}`);
-  }
-});
-```
-
-### Custom Field Names
-
-```javascript
-const selector = initVehicleSelector({
-  formId: "vehicle-selector-form",
-  fieldNames: ["year", "brand", "model", "trim", "body", "engine", "transmission"],
-  vehicleData: myData
-});
-```
-
-### Save to localStorage
-
-```javascript
-const selector = initVehicleSelector({
-  vehicleData: carData,
-  onComplete: (result) => {
-    localStorage.setItem('selectedVehicle', JSON.stringify(result.values));
-    window.location.href = '/parts';
+  customActions: {
+    buttonText: "Browse Parts",
+    buttonVisibility: "always"
   },
-  onReset: (result) => {
-    localStorage.removeItem('selectedVehicle');
-    console.log(`Reset from: ${result.previousSummary}`);
+  onComplete: (result) => {
+    // result.redirectURL = "/parts/bmw/m3/?year=2020&submodel=competition"
+    window.location.href = result.redirectURL;
   }
 });
 ```
 
-### API Integration
+### Product Page Setup (Show When No Match)
 
 ```javascript
+// Define vehicles this page serves
+const pageVehicles = [
+  { year: "2020", make: "BMW", model: "M3", submodel: "Competition", chassis: "4-door Sedan", engine: "Petrol 3.0L Twin-Turbo", transmission: "8-speed Auto" },
+  { year: "2020", make: "BMW", model: "M3", submodel: "Competition", chassis: "4-door Sedan", engine: "Petrol 3.0L Twin-Turbo", transmission: "Manual" }
+];
+
 const selector = initVehicleSelector({
   vehicleData: carData,
-  onComplete: async (result) => {
-    try {
-      await fetch('/api/save-vehicle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result.values)
-      });
-      console.log('Vehicle saved!');
-    } catch (error) {
-      console.error('Save failed:', error);
+  customActions: {
+    buttonText: "View Matching Parts",
+    compatibleVehicles: pageVehicles,
+    buttonVisibility: "compatibility", // Only show when vehicle doesn't match page
+    buttonUrlCategory: "braking-system",
+    buttonUrlRef: "utm_source=product_page"
+  },
+  onComplete: (result) => {
+    if (result.matchType === "perfect") {
+      console.log("User's vehicle matches this page perfectly!");
+      // Button will be hidden automatically
+    } else {
+      console.log(`${result.matchType} match - redirecting to: ${result.redirectURL}`);
+      // Button will be visible with redirect URL
     }
   }
 });
+```
+
+### Advanced Configuration with Error Handling
+
+```javascript
+const selector = initVehicleSelector({
+  vehicleData: carData,
+  customActions: {
+    buttonText: "Find Parts",
+    buttonVisibility: "compatibility",
+    buttonUrlCategory: "suspension",
+    buttonUrlRef: "source=configurator&campaign=spring2024"
+  },
+  onComplete: (result) => {
+    // result.values: { year: "2020", make: "BMW", ... }
+    // result.summary: "2020 BMW M3 Competition 4-door Sedan..."
+    // result.redirectURL: "/parts/bmw/m3/suspension/?year=2020&submodel=competition&ref=source%3Dconfigurator%26campaign%3Dspring2024"
+    // result.matchType: "none" | "partial" | "perfect"
+    
+    analytics.track('vehicle_configured', {
+      vehicle: result.values,
+      matchType: result.matchType
+    });
+  },
+  onError: (error) => {
+    console.error('Vehicle selector error:', error);
+    // Handle errors gracefully
+  }
+});
+```
+
+### URL Generation Examples
+
+The selector automatically generates clean, SEO-friendly URLs:
+
+```javascript
+// Input: { year: "2020", make: "Audi", model: "A5 Sportback", submodel: "Premium Plus" }
+// Output: "/parts/audi/a5-sportback/?year=2020&submodel=premium-plus"
+
+// With category: 
+// Output: "/parts/audi/a5-sportback/braking-system/?year=2020&submodel=premium-plus"
+
+// With tracking:
+// Output: "/parts/audi/a5-sportback/?year=2020&submodel=premium-plus&ref=utm_source%3Dselector"
 ```
 
 ## Methods
@@ -247,6 +302,17 @@ selector.updateData({
 });
 ```
 
+### `updateButtonConfig(newConfig)`
+Update button configuration dynamically.
+
+```javascript
+selector.updateButtonConfig({
+  buttonText: "New Button Text",
+  buttonVisibility: "never",
+  compatibleVehicles: [/* new vehicles */]
+});
+```
+
 ### `destroy()`
 Clean up event listeners and timers.
 
@@ -254,29 +320,43 @@ Clean up event listeners and timers.
 selector.destroy();
 ```
 
-## Quick Select Dropdown Example
+## Vehicle Matching Logic
 
-Create a dropdown with predefined vehicles:
+The selector determines three types of matches:
 
-```html
-<select id="vehicle-presets">
-  <option value="">Choose a preset...</option>
-  <option value="bmw-m3">2020 BMW M3 Competition</option>
-  <option value="audi-a4">2020 Audi A4 Premium</option>
-</select>
+### Perfect Match
+All 7 fields exactly match a vehicle in `compatibleVehicles`:
+```javascript
+// User selected: 2020 BMW M3 Competition 4-door Sedan Petrol 3.0L 8-speed Auto
+// Page vehicle: 2020 BMW M3 Competition 4-door Sedan Petrol 3.0L 8-speed Auto
+// Result: matchType = "perfect" (button hidden in compatibility mode)
 ```
 
+### Partial Match
+Year, Make, Model match, but other fields differ or contain "I don't know":
 ```javascript
+// User selected: 2020 BMW M3 Competition 4-door Sedan "I don't know" "I don't know"
+// Page vehicle: 2020 BMW M3 Competition 4-door Sedan Petrol 3.0L 8-speed Auto
+// Result: matchType = "partial" (button shown in compatibility mode)
+```
+
+### No Match
+Year, Make, or Model don't match any `compatibleVehicles`:
+```javascript
+// User selected: 2020 Audi A4 ...
+// Page vehicles: Only BMW M3 variants
+// Result: matchType = "none" (button shown in compatibility mode)
+```
+
+## Quick Select Integration
+
+```javascript
+// Preset configurations
 const presets = {
   'bmw-m3': {
     year: "2020", make: "BMW", model: "M3", 
     submodel: "Competition", chassis: "4-door Sedan",
     engine: "Petrol 3.0L Twin-Turbo", transmission: "8-speed Auto"
-  },
-  'audi-a4': {
-    year: "2020", make: "Audi", model: "A4",
-    submodel: "Premium", chassis: "4-door Sedan", 
-    engine: "Petrol 2.0L TFSI", transmission: "7-speed S tronic"
   }
 };
 
@@ -294,14 +374,34 @@ document.getElementById('vehicle-presets').addEventListener('change', (e) => {
 
 | Class | Purpose |
 |-------|---------|
+| `.vehicle-selector-step` | Step container |
 | `.vehicle-selector-input-group` | Input field container |
 | `.vehicle-selector-input-control` | Input field |
 | `.vehicle-selector-nav-arrow` | Navigation buttons |
 | `.nav-forward` / `.nav-backwards` | Arrow direction |
 | `.vs-clear-selection` | Clear field button |
 | `.vehicle-selector-reset-selection` | Reset all button |
+| `.vehicle-selector-button` | Action button |
 | `.vehicle-selector-puck` | Visual indicator |
 | `.disabled` / `.active` / `.completed` | Field states |
+| `.hidden` | Hide elements |
+
+## Error Handling
+
+The selector includes comprehensive error handling:
+
+```javascript
+// URL generation errors
+onError: (error) => {
+  if (error.type === 'url_generation') {
+    console.log('Cannot generate URL:', error.message);
+    // Button will be hidden automatically
+  }
+}
+
+// Validation errors
+// Thrown when Year, Make, or Model are missing for URL generation
+```
 
 ## Browser Support
 
@@ -315,3 +415,6 @@ document.getElementById('vehicle-presets').addEventListener('change', (e) => {
 - **Keyboard**: Full keyboard navigation support (arrows, enter, escape)
 - **Mobile**: Touch-friendly with responsive design
 - **Accessibility**: Proper focus management and ARIA attributes
+- **URLs**: All URLs are automatically encoded and SEO-friendly
+- **"I don't know"**: Selecting "I don't know" for any field excludes it from URL parameters
+- **Button Logic**: Use `"compatibility"` visibility for product pages, `"always"` for homepage
