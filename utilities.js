@@ -882,8 +882,11 @@ function initVehicleSelector(config = {}) {
             try {
                 onReset({
                     previousValues: previousValues,
-                    previousSummary: fieldNames.map(fieldName => previousValues[fieldName]).filter(Boolean).join(", "),
-                    resetBy: 'button', // Indicates this was triggered by the reset button
+                    previousSummary: fieldNames
+                        .map(fieldName => previousValues[fieldName])
+                        .filter(value => value && value !== "I don't know") // Filter out "I don't know"
+                        .join(", "),
+                    resetBy: 'button',
                     getState: () => ({ ...selectedValues })
                 });
             } catch (error) {
@@ -980,17 +983,21 @@ function initVehicleSelector(config = {}) {
     function generateSummary(skipOnComplete = false) {
         if (!elements.summaryElement) return;
 
-        const parts = fieldNames.map(fieldName => selectedValues[fieldName]).filter(Boolean);
+        // Filter out "I don't know" values and undefined/null values
+        const parts = fieldNames
+            .map(fieldName => selectedValues[fieldName])
+            .filter(value => value && value !== "I don't know");
+        
         elements.summaryElement.textContent = parts.join(", ");
-
-        // Check if all required fields are completed
+        
+        // Check if all required fields are completed (including "I don't know" as valid)
         const isComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
-
+        
         if (isComplete) {
             // Generate redirect URL and match type
             const redirectURL = generateRedirectURL(selectedValues);
             const matchType = getVehicleMatchType(selectedValues);
-
+            
             // Update button visibility and properties
             if (redirectURL) {
                 updateButtonVisibility(matchType);
@@ -1001,16 +1008,16 @@ function initVehicleSelector(config = {}) {
                     elements.actionButton.classList.add("hidden");
                 }
             }
-
+            
             // Trigger onComplete callback
             if (typeof onComplete === 'function' && !skipOnComplete) {
                 try {
                     onComplete({
                         values: { ...selectedValues },
-                        summary: parts.join(", "),
+                        summary: parts.join(", "), // Summary without "I don't know"
                         redirectURL: redirectURL,
                         matchType: matchType,
-                        reset: () => handleResetSelection({ preventDefault: () => { } }),
+                        reset: () => handleResetSelection({ preventDefault: () => {} }),
                         getState: () => ({ ...selectedValues })
                     });
                 } catch (error) {
@@ -1023,11 +1030,13 @@ function initVehicleSelector(config = {}) {
     // Update intermediary summary (first 4 fields) in step 2
     function updateIntermediarySummary() {
         if (!elements.intermediarySummaryElement) return;
-
-        // Get first 4 field values (Year, Make, Model, Submodel)
+        
+        // Get first 4 field values (Year, Make, Model, Submodel) and filter out "I don't know"
         const intermediaryFields = fieldNames.slice(0, 4);
-        const parts = intermediaryFields.map(fieldName => selectedValues[fieldName]).filter(Boolean);
-
+        const parts = intermediaryFields
+            .map(fieldName => selectedValues[fieldName])
+            .filter(value => value && value !== "I don't know");
+        
         if (parts.length > 0) {
             elements.intermediarySummaryElement.textContent = parts.join(' ');
         } else {
