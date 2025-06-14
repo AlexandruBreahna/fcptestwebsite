@@ -1147,10 +1147,21 @@ function initVehicleSelector(config = {}) {
             return null;
         }
 
-        // Build base URL
-        let baseUrl = `/parts/${make.toLowerCase()}/${model.toLowerCase()}`;
+        // Helper function to encode URL segments
+        function encodeUrlSegment(str) {
+            return encodeURIComponent(str)
+                .replace(/%20/g, '-')           // Replace %20 (space) with hyphen
+                .replace(/[()]/g, '')           // Remove parentheses
+                .replace(/[,&]/g, '-')          // Replace commas and ampersands with hyphens
+                .replace(/-+/g, '-')            // Replace multiple consecutive hyphens with single hyphen
+                .replace(/^-|-$/g, '')          // Remove leading/trailing hyphens
+                .toLowerCase();
+        }
+
+        // Build base URL with encoded segments
+        let baseUrl = `/parts/${encodeUrlSegment(make)}/${encodeUrlSegment(model)}`;
         if (buttonUrlCategory) {
-            baseUrl += `/${buttonUrlCategory}`;
+            baseUrl += `/${encodeUrlSegment(buttonUrlCategory)}`;
         }
         baseUrl += '/';
 
