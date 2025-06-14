@@ -926,12 +926,12 @@ function initVehicleSelector(config = {}) {
 
     // Update puck position and visibility
     function updatePuck(activeInputIndex) {
-        // Find the current step
-        const currentStep = elements.steps[currentStep];
-        if (!currentStep) return;
+        // Find the current step element
+        const currentStepElement = elements.steps[currentStep];
+        if (!currentStepElement) return;
 
         // Find the puck in the current step
-        const puck = currentStep.querySelector('.vehicle-selector-puck');
+        const puck = currentStepElement.querySelector('.vehicle-selector-puck');
         if (!puck) return;
 
         // Get the active input and its group
@@ -943,10 +943,10 @@ function initVehicleSelector(config = {}) {
 
         // Get the position and dimensions of the active input group
         const groupRect = activeGroup.getBoundingClientRect();
-        const setRect = currentStep.getBoundingClientRect();
+        const stepRect = currentStepElement.getBoundingClientRect();
 
         // Calculate relative position within the step
-        const leftOffset = groupRect.left - setRect.left;
+        const leftOffset = groupRect.left - stepRect.left;
         const width = groupRect.width;
 
         // Apply the position and make visible immediately
