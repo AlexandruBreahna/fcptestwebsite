@@ -162,35 +162,41 @@ function initVehicleSelector() {
         }
     }
 
-    // Handle all click events through delegation - fix: debugging clear buttons
+    // Handle all click events through delegation - add reset button handling
     function handleFormClick(event) {
         // Handle navigation arrows
         const navArrow = event.target.closest(".vehicle-selector-nav-arrow");
         if (navArrow) {
-            event.preventDefault();
-
-            // Check if arrow is disabled
-            if (navArrow.classList.contains("disabled")) {
-                return;
-            }
-
-            const isForward = navArrow.classList.contains("nav-forward");
-            const isBackward = navArrow.classList.contains("nav-backwards");
-
-            if (isForward) {
-                navigateForward();
-            } else if (isBackward) {
-                navigateBackward();
-            }
+        event.preventDefault();
+        
+        // Check if arrow is disabled
+        if (navArrow.classList.contains("disabled")) {
             return;
         }
-
-        // Handle clear buttons - enhanced debugging
+    
+        const isForward = navArrow.classList.contains("nav-forward");
+        const isBackward = navArrow.classList.contains("nav-backwards");
+    
+        if (isForward) {
+            navigateForward();
+        } else if (isBackward) {
+            navigateBackward();
+        }
+        return;
+        }
+    
+        // Handle reset button
+        const resetButton = event.target.closest(".vehicle-selector-reset-selection");
+        if (resetButton) {
+        handleResetSelection(event);
+        return;
+        }
+    
+        // Handle clear buttons
         const clearButton = event.target.closest(".vs-clear-selection");
-
         if (clearButton) {
-            handleClearSelection(event);
-            return;
+        handleClearSelection(event);
+        return;
         }
     }
 
@@ -677,25 +683,66 @@ function initVehicleSelector() {
         clearFieldAndSubsequent(fromIndex + 1);
     }
 
-    // Handle navigation arrow clicks
-    function handleNavigation(event) {
+    // Handle reset selection clicks - reset entire selector without triggering onComplete
+    function handleResetSelection(event) {
         event.preventDefault();
-
-        const arrow = event.currentTarget;
-
-        // Check if arrow is disabled
-        if (arrow.classList.contains("disabled")) {
-            return;
+        
+        // Clear all selected values
+        selectedValues = {};
+        
+        // Clear summary
+        if (elements.summaryElement) {
+        elements.summaryElement.textContent = "";
         }
-
-        const isForward = arrow.classList.contains("nav-forward");
-        const isBackward = arrow.classList.contains("nav-backwards");
-
-        if (isForward) {
-            navigateForward();
-        } else if (isBackward) {
-            navigateBackward();
+        
+        // Reset all input fields
+        elements.inputs.forEach((input, index) => {
+        if (!input) return;
+        
+        input.value = "";
+        const group = input.closest(".vehicle-selector-input-group");
+        if (group) {
+            group.classList.remove("completed", "active");
+            if (index === 0) {
+            // First field should be active
+            group.classList.remove("disabled");
+            group.classList.add("active");
+            input.disabled = false;
+            } else {
+            // All other fields should be disabled
+            group.classList.add("disabled");
+            input.disabled = true;
+            }
         }
+        });
+        
+        // Hide dropdown and puck
+        hideDropdown();
+        hidePuck();
+        
+        // Reset to first question set
+        currentQuestionSet = 0;
+        currentFieldIndex = 0;
+        
+        elements.questionSets.forEach((set, index) => {
+        if (index === 0) {
+            set.classList.remove("hidden");
+        } else {
+            set.classList.add("hidden");
+        }
+        });
+        
+        // Focus on the first field
+        if (elements.inputs[0]) {
+        elements.inputs[0].focus();
+        showDropdownForField(0);
+        updatePuck(0);
+        }
+        
+        // Update navigation arrows
+        updateNavigationArrows();
+        
+        console.log('Vehicle selector reset to initial state');
     }
 
     // Navigate to next question set
@@ -784,21 +831,29 @@ function initVehicleSelector() {
         });
     }
 
-    // Generate summary of all selections
-    function generateSummary() {
+    // Generate summary of all selections and handle completion
+    function generateSummary(skipOnComplete = false) {
         if (!elements.summaryElement) return;
-
-        const parts = [
-            selectedValues.year,
-            selectedValues.make,
-            selectedValues.model,
-            selectedValues.submodel,
-            selectedValues.chassis,
-            selectedValues.engine,
-            selectedValues.transmission
-        ].filter(Boolean);
-
+    
+        const parts = fieldNames.map(fieldName => selectedValues[fieldName]).filter(Boolean);
         elements.summaryElement.textContent = parts.join(", ");
+        
+        // Check if all required fields are completed and onComplete should be triggered
+        const isComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
+        
+        if (isComplete && typeof onComplete === 'function' && !skipOnComplete) {
+        // Call the completion callback with the selected values
+        try {
+            onComplete({
+            values: { ...selectedValues },
+            summary: parts.join(", "),
+            reset: () => handleResetSelection({ preventDefault: () => {} }), // Provide reset function
+            getState: () => ({ ...selectedValues })
+            });
+        } catch (error) {
+            console.error('Error in vehicle selector completion callback:', error);
+        }
+        }
     }
 
     // Handle clicks outside dropdown
@@ -897,7 +952,12 @@ function initVehicleSelector() {
             cleanup.clearTimers();
             selectedValues = {};
         },
-        reset: setupInitialState,
-        getState: () => ({ ...selectedValues })
+        reset: () => handleResetSelection({ preventDefault: () => { } }), // Public reset method
+        setupInitialState: setupInitialState, // Keep original for backward compatibility
+        getState: () => ({ ...selectedValues }),
+        getConfig: () => ({ formId, dropdownId, summaryId, fieldNames }),
+        updateData: (newData) => {
+            Object.assign(vehicleData, newData);
+        }
     };
 }
