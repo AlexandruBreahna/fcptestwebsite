@@ -3,7 +3,8 @@ function initVehicleSelector(config = {}) {
     const {
         formId = "vehicle-selector-form",
         dropdownId = "vehicle-selector-dropdown", 
-        summaryId = "vehicle-selector-summary",
+        summaryId = "vehicle-selector-complete-summary",
+        intermediarySummaryId = "vehicle-selector-intermediary-summary",
         fieldNames = ["year", "make", "model", "submodel", "chassis", "engine", "transmission"],
         onComplete = null, // Callback function when vehicle configuration is complete
         onReset = null, // Callback function when vehicle selector is reset
@@ -16,6 +17,7 @@ function initVehicleSelector(config = {}) {
         dropdown: document.getElementById(dropdownId),
         dropdownBox: null, // Will be set after dropdown check
         summaryElement: document.getElementById(summaryId),
+        intermediarySummaryElement: document.getElementById(intermediarySummaryId),
         questionSets: document.querySelectorAll(
             ".vehicle-selector-questions-set"
         ),
@@ -481,6 +483,11 @@ function initVehicleSelector(config = {}) {
 
         hideDropdown();
 
+        // Update intermediary summary if we're in the first 4 fields
+        if (fieldIndex < 4) {
+            updateIntermediarySummary();
+        }
+
         // Progress to next field or question set - immediate progression for smooth flow
         progressToNextField(fieldIndex);
         updateNavigationArrows();
@@ -519,9 +526,18 @@ function initVehicleSelector(config = {}) {
         return fieldRanges[currentQuestionSet] || [];
     }
 
-    // Switch between question sets - add puck management
+    // Switch between question sets
     function switchToQuestionSet(setIndex) {
         currentQuestionSet = setIndex;
+
+        // Hide dropdown when navigating between question sets
+        hideDropdown();
+
+        // Remove focus from any currently focused input to ensure dropdown stays closed
+        const currentlyFocused = document.activeElement;
+        if (currentlyFocused && elements.inputs.includes(currentlyFocused)) {
+            currentlyFocused.blur();
+        }
 
         // Hide puck in all question sets
         hidePuck();
@@ -532,6 +548,11 @@ function initVehicleSelector(config = {}) {
         // Show target question set
         if (elements.questionSets[setIndex]) {
             elements.questionSets[setIndex].classList.remove("hidden");
+        }
+
+        // Update intermediary summary when showing step 2
+        if (setIndex === 1) {
+            updateIntermediarySummary();
         }
 
         // Enable appropriate field for the new set
@@ -560,13 +581,16 @@ function initVehicleSelector(config = {}) {
             if (fieldToEnable !== undefined) {
                 enableField(fieldToEnable);
             }
+        } else {
+            // No fields in this question set (like the summary page) - ensure no field has focus
+            currentFieldIndex = -1;
         }
 
         // Update navigation arrow states
         updateNavigationArrows();
     }
 
-    // Enable a specific field - no delay needed since we prevent blur conflicts
+    // Enable a specific field
     function enableField(index) {
         const input = elements.inputs[index];
         if (!input) return;
@@ -686,7 +710,12 @@ function initVehicleSelector(config = {}) {
         
         // Clear summary
         if (elements.summaryElement) {
-            elements.summaryElement.textContent = "";
+            elements.summaryElement.textContent = "Your complete vehicle configuration";
+        }
+
+        // Clear intermediary summary
+        if (elements.intermediarySummaryElement) {
+            elements.intermediarySummaryElement.textContent = "Year, Make, Model and Submodel";
         }
         
         // Reset all input fields
@@ -863,6 +892,22 @@ function initVehicleSelector(config = {}) {
             }
         }
     }
+
+    // Update intermediary summary (first 4 fields) in step 2
+    function updateIntermediarySummary() {
+        if (!elements.intermediarySummaryElement) return;
+        
+        // Get first 4 field values (Year, Make, Model, Submodel)
+        const intermediaryFields = fieldNames.slice(0, 4);
+        const parts = intermediaryFields.map(fieldName => selectedValues[fieldName]).filter(Boolean);
+        
+        if (parts.length > 0) {
+            elements.intermediarySummaryElement.textContent = parts.join(' ');
+        } else {
+            elements.intermediarySummaryElement.textContent = "Year, Make, Model and Submodel";
+        }
+    }
+
     // Handle clicks outside dropdown
     function handleOutsideClick(event) {
         if (
@@ -941,17 +986,11 @@ function initVehicleSelector(config = {}) {
                 return false;
             }
             
-            // Store current state for potential rollback
-            const previousValues = { ...selectedValues };
-            const previousQuestionSet = currentQuestionSet;
-            const previousFieldIndex = currentFieldIndex;
-            
             // Reset to initial state first
             handleResetSelection({ preventDefault: () => {} }, true); // Skip callback during reset
             
             // Set values in the correct order
             let lastSetFieldIndex = -1;
-            let targetQuestionSet = 0;
             
             fieldNames.forEach((fieldName, index) => {
                 if (vehicleConfig[fieldName]) {
@@ -969,13 +1008,12 @@ function initVehicleSelector(config = {}) {
                         }
                         
                         lastSetFieldIndex = index;
-                        
-                        // Determine which question set we should be on
-                        if (index >= 4 && index <= 6) targetQuestionSet = 1;
-                        else if (index >= 7) targetQuestionSet = 2;
                     }
                 }
             });
+            
+            // Update intermediary summary if we have first 4 fields
+            updateIntermediarySummary();
             
             // Switch to appropriate question set
             if (lastSetFieldIndex >= 0) {
@@ -1076,7 +1114,7 @@ function initVehicleSelector(config = {}) {
         reset: (skipCallback = false) => handleResetSelection({ preventDefault: () => {} }, skipCallback),
         setupInitialState: setupInitialState,
         getState: () => ({ ...selectedValues }),
-        getConfig: () => ({ formId, dropdownId, summaryId, fieldNames }),
+        getConfig: () => ({ formId, dropdownId, summaryId, intermediarySummaryId, fieldNames }),
         updateData: (newData) => {
             Object.assign(vehicleData, newData);
         },
