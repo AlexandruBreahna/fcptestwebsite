@@ -1,0 +1,71 @@
+<html>
+
+<head>
+
+</head>
+
+<body>
+    <section class="vehicle-selector">
+        <div class="container">
+            <form id="vehicle-selector-form" class="vehicle-selector-form">
+                <!-- Step 1: Basic Info -->
+                <div class="vehicle-selector-step">
+                    <div class="vehicle-selector-step-content">
+                        <div class="vehicle-selector-puck"></div>
+
+                        <div class="vehicle-selector-input-group">
+                            <input name="year" type="text" class="vehicle-selector-input-control">
+                            <label class="vehicle-selector-input-label">Select Year</label>
+                            <a href="#" class="vs-clear-selection">×</a>
+                        </div>
+
+                        <div class="vehicle-selector-input-group">
+                            <input name="make" type="text" class="vehicle-selector-input-control">
+                            <label class="vehicle-selector-input-label">Select Make</label>
+                            <a href="#" class="vs-clear-selection">×</a>
+                        </div>
+
+                        <!-- Add Model and Submodel fields similarly -->
+
+                        <a href="#" class="vehicle-selector-nav-arrow nav-forward">Next →</a>
+                    </div>
+                </div>
+
+                <!-- Step 2: Details -->
+                <div class="vehicle-selector-step hidden">
+                    <div class="vehicle-selector-step-content">
+                        <div class="vehicle-selector-puck"></div>
+                        <a href="#" class="vehicle-selector-nav-arrow nav-backwards">← Back</a>
+
+                        <!-- Add Chassis, Engine, Transmission fields -->
+
+                        <a href="#" class="vehicle-selector-nav-arrow nav-forward">Next →</a>
+                    </div>
+                </div>
+
+                <!-- Step 3: Summary -->
+                <div class="vehicle-selector-step hidden">
+                    <div class="vehicle-selector-step-content">
+                        <a href="#" class="vehicle-selector-nav-arrow nav-backwards">← Back</a>
+
+                        <div class="vehicle-selector-summary">
+                            <div id="vehicle-selector-summary">Your selection will appear here</div>
+                        </div>
+
+                        <button class="vehicle-selector-reset-selection">Start Over</button>
+                    </div>
+                    <a href="#" class="vehicle-selector-button">Browse Parts</a>
+                </div>
+
+                <!-- Dropdown (shared) -->
+                <div id="vehicle-selector-dropdown" class="vehicle-selector-dropdown">
+                    <div class="dropdown-list">
+                        <div class="dropdown-box-2"></div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+</body>
+
+</html>

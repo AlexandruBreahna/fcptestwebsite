@@ -20,54 +20,61 @@ A JavaScript component that creates an interactive, step-by-step vehicle configu
 <section class="vehicle-selector">
   <div class="container">
     <form id="vehicle-selector-form" class="vehicle-selector-form">
-      <!-- Step 1: Basic Info -->
-      <div class="vehicle-selector-questions-set">
-        <div class="vehicle-selector-puck"></div>
-        
-        <div class="vehicle-selector-input-group">
-          <input name="year" type="text" class="vehicle-selector-input-control">
-          <label class="vehicle-selector-input-label">Select Year</label>
-          <a href="#" class="vs-clear-selection">×</a>
+        <!-- Step 1: Basic Info -->
+        <div class="vehicle-selector-step">
+            <div class="vehicle-selector-step-content">
+                <div class="vehicle-selector-puck"></div>
+
+                <div class="vehicle-selector-input-group">
+                    <input name="year" type="text" class="vehicle-selector-input-control">
+                    <label class="vehicle-selector-input-label">Select Year</label>
+                    <a href="#" class="vs-clear-selection">×</a>
+                </div>
+
+                <div class="vehicle-selector-input-group">
+                    <input name="make" type="text" class="vehicle-selector-input-control">
+                    <label class="vehicle-selector-input-label">Select Make</label>
+                    <a href="#" class="vs-clear-selection">×</a>
+                </div>
+
+                <!-- Add Model and Submodel fields similarly -->
+
+                <a href="#" class="vehicle-selector-nav-arrow nav-forward">Next →</a>
+            </div>
         </div>
-        
-        <div class="vehicle-selector-input-group">
-          <input name="make" type="text" class="vehicle-selector-input-control">
-          <label class="vehicle-selector-input-label">Select Make</label>
-          <a href="#" class="vs-clear-selection">×</a>
+
+        <!-- Step 2: Details -->
+        <div class="vehicle-selector-step hidden">
+            <div class="vehicle-selector-step-content">
+                <div class="vehicle-selector-puck"></div>
+                <a href="#" class="vehicle-selector-nav-arrow nav-backwards">← Back</a>
+
+                <!-- Add Chassis, Engine, Transmission fields -->
+
+                <a href="#" class="vehicle-selector-nav-arrow nav-forward">Next →</a>
+            </div>
         </div>
-        
-        <!-- Add Model and Submodel fields similarly -->
-        
-        <a href="#" class="vehicle-selector-nav-arrow nav-forward">Next →</a>
-      </div>
-      
-      <!-- Step 2: Details -->
-      <div class="vehicle-selector-questions-set hidden">
-        <div class="vehicle-selector-puck"></div>
-        <a href="#" class="vehicle-selector-nav-arrow nav-backwards">← Back</a>
-        
-        <!-- Add Chassis, Engine, Transmission fields -->
-        
-        <a href="#" class="vehicle-selector-nav-arrow nav-forward">Next →</a>
-      </div>
-      
-      <!-- Step 3: Summary -->
-      <div class="vehicle-selector-questions-set hidden">
-        <a href="#" class="vehicle-selector-nav-arrow nav-backwards">← Back</a>
-        
-        <div class="vehicle-selector-summary">
-          <div id="vehicle-selector-summary">Your selection will appear here</div>
+
+        <!-- Step 3: Summary -->
+        <div class="vehicle-selector-step hidden">
+            <div class="vehicle-selector-step-content">
+                <a href="#" class="vehicle-selector-nav-arrow nav-backwards">← Back</a>
+
+                <div class="vehicle-selector-summary">
+                    <div id="vehicle-selector-summary">Your selection will appear here</div>
+                </div>
+
+                <button class="vehicle-selector-reset-selection">Start Over</button>
+            </div>
+            <a href="#" class="vehicle-selector-button">Browse Parts</a>
         </div>
-        
-        <button class="vehicle-selector-reset-selection">Start Over</button>
-      </div>
-      
-      <!-- Dropdown (shared) -->
-      <div id="vehicle-selector-dropdown" class="vehicle-selector-dropdown">
-        <div class="dropdown-list">
-          <div class="dropdown-box-2"></div>
+
+        <!-- Dropdown (shared) -->
+        <div id="vehicle-selector-dropdown" class="vehicle-selector-dropdown">
+            <div class="dropdown-list">
+                <div class="dropdown-box-2"></div>
+            </div>
         </div>
-      </div>
     </form>
   </div>
 </section>
@@ -118,7 +125,8 @@ const vehicleSelector = initVehicleSelector({
 |--------|------|---------|-------------|
 | `formId` | string | `"vehicle-selector-form"` | ID of the form element |
 | `dropdownId` | string | `"vehicle-selector-dropdown"` | ID of the dropdown element |
-| `summaryId` | string | `"vehicle-selector-summary"` | ID of the summary element |
+| `intermediarySummaryId` | string | `"vehicle-selector-intermediary-summary"` | Intermediary ID of the summary element |
+| `summaryId` | string | `"vehicle-selector-complete-summary"` | ID of the summary element |
 | `fieldNames` | array | `["year", "make", "model", ...]` | Names of the input fields |
 | `vehicleData` | object | `window.carData \|\| {}` | Vehicle data object |
 | `onComplete` | function | `null` | Callback when all fields are filled |

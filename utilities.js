@@ -18,9 +18,7 @@ function initVehicleSelector(config = {}) {
         dropdownBox: null, // Will be set after dropdown check
         summaryElement: document.getElementById(summaryId),
         intermediarySummaryElement: document.getElementById(intermediarySummaryId),
-        questionSets: document.querySelectorAll(
-            ".vehicle-selector-questions-set"
-        ),
+        steps: document.querySelectorAll(".vehicle-selector-step"), // Updated selector
         navArrows: document.querySelectorAll(".vehicle-selector-nav-arrow"),
         inputs: fieldNames.map((name) =>
             document.querySelector(`[name="${name}"]`)
@@ -78,12 +76,12 @@ function initVehicleSelector(config = {}) {
             }
         });
 
-        // Show first question set, hide others
-        elements.questionSets.forEach((set, index) => {
+        // Show first step, hide others
+        elements.steps.forEach((step, index) => {
             if (index === 0) {
-                set.classList.remove("hidden");
+                step.classList.remove("hidden");
             } else {
-                set.classList.add("hidden");
+                step.classList.add("hidden");
             }
         });
     }
@@ -542,12 +540,12 @@ function initVehicleSelector(config = {}) {
         // Hide puck in all question sets
         hidePuck();
 
-        // Hide all question sets
-        elements.questionSets.forEach((set) => set.classList.add("hidden"));
+        // Hide all steps
+        elements.steps.forEach((step) => step.classList.add("hidden"));
 
-        // Show target question set
-        if (elements.questionSets[setIndex]) {
-            elements.questionSets[setIndex].classList.remove("hidden");
+        // Show target step
+        if (elements.steps[setIndex]) {
+            elements.steps[setIndex].classList.remove("hidden");
         }
 
         // Update intermediary summary when showing step 2
@@ -747,11 +745,11 @@ function initVehicleSelector(config = {}) {
         currentQuestionSet = 0;
         currentFieldIndex = 0;
         
-        elements.questionSets.forEach((set, index) => {
+        elements.steps.forEach((step, index) => {
             if (index === 0) {
-                set.classList.remove("hidden");
+                step.classList.remove("hidden");
             } else {
-                set.classList.add("hidden");
+                step.classList.add("hidden");
             }
         });
         
@@ -837,10 +835,8 @@ function initVehicleSelector(config = {}) {
 
         // Update forward arrows
         forwardArrows.forEach((arrow) => {
-            const questionSet = arrow.closest(".vehicle-selector-questions-set");
-            const setIndex = Array.from(elements.questionSets).indexOf(
-                questionSet
-            );
+            const step = arrow.closest(".vehicle-selector-step");
+            const setIndex = Array.from(elements.steps).indexOf(step);
 
             if (setIndex === currentQuestionSet) {
                 if (isQuestionSetComplete(currentQuestionSet)) {
@@ -853,10 +849,8 @@ function initVehicleSelector(config = {}) {
 
         // Update backward arrows - always enabled except for first set
         backwardArrows.forEach((arrow) => {
-            const questionSet = arrow.closest(".vehicle-selector-questions-set");
-            const setIndex = Array.from(elements.questionSets).indexOf(
-                questionSet
-            );
+            const step = arrow.closest(".vehicle-selector-step");
+            const setIndex = Array.from(elements.steps).indexOf(step);
 
             if (setIndex === currentQuestionSet) {
                 if (currentQuestionSet === 0) {
@@ -932,12 +926,12 @@ function initVehicleSelector(config = {}) {
 
     // Update puck position and visibility
     function updatePuck(activeInputIndex) {
-        // Find the current question set
-        const currentSet = elements.questionSets[currentQuestionSet];
-        if (!currentSet) return;
+        // Find the current step
+        const currentStep = elements.steps[currentQuestionSet];
+        if (!currentStep) return;
 
-        // Find the puck in the current question set
-        const puck = currentSet.querySelector('.vehicle-selector-puck');
+        // Find the puck in the current step
+        const puck = currentStep.querySelector('.vehicle-selector-puck');
         if (!puck) return;
 
         // Get the active input and its group
@@ -949,9 +943,9 @@ function initVehicleSelector(config = {}) {
 
         // Get the position and dimensions of the active input group
         const groupRect = activeGroup.getBoundingClientRect();
-        const setRect = currentSet.getBoundingClientRect();
+        const setRect = currentStep.getBoundingClientRect();
 
-        // Calculate relative position within the question set
+        // Calculate relative position within the step
         const leftOffset = groupRect.left - setRect.left;
         const width = groupRect.width;
 
@@ -963,8 +957,8 @@ function initVehicleSelector(config = {}) {
 
     // Hide puck when no field is active
     function hidePuck() {
-        elements.questionSets.forEach(set => {
-            const puck = set.querySelector('.vehicle-selector-puck');
+        elements.steps.forEach(step => {
+            const puck = step.querySelector('.vehicle-selector-puck');
             if (puck) {
                 puck.style.display = 'none';
             }
