@@ -354,6 +354,34 @@ function initVehicleSelector(config = {}) {
     function getOptionsForField(index) {
         const fieldName = fieldNames[index];
 
+        // Helper function to filter out non-vehicle keys
+        function filterVehicleKeys(obj) {
+            if (!obj || typeof obj !== 'object') return [];
+            return Object.keys(obj).filter(key => key !== 'redirectUrls').sort();
+        }
+
+        // Helper function to collect all unique options when "I don't know" is selected
+        function collectAllOptions(data, targetLevel, currentLevel = 0) {
+            if (!data || typeof data !== 'object') return [];
+
+            const options = new Set();
+
+            if (currentLevel === targetLevel) {
+                // We've reached target level, collect keys
+                filterVehicleKeys(data).forEach(key => options.add(key));
+            } else {
+                // Go deeper into each branch
+                Object.keys(data).forEach(key => {
+                    if (key !== 'redirectUrls' && typeof data[key] === 'object') {
+                        const deepOptions = collectAllOptions(data[key], targetLevel, currentLevel + 1);
+                        deepOptions.forEach(option => options.add(option));
+                    }
+                });
+            }
+
+            return Array.from(options).sort();
+        }
+
         try {
             switch (fieldName) {
                 case "year":
@@ -362,43 +390,101 @@ function initVehicleSelector(config = {}) {
                 case "make":
                     const year = selectedValues.year;
                     return year && vehicleData[year]
-                        ? Object.keys(vehicleData[year]).sort()
+                        ? filterVehicleKeys(vehicleData[year])
                         : [];
 
                 case "model":
                     const yearData = vehicleData[selectedValues.year];
                     const makeData = yearData?.[selectedValues.make];
-                    return makeData ? Object.keys(makeData).sort() : [];
+                    return makeData ? filterVehicleKeys(makeData) : [];
 
                 case "submodel":
                     const modelData =
                         vehicleData[selectedValues.year]?.[selectedValues.make]?.[
                         selectedValues.model
                         ];
-                    return modelData ? Object.keys(modelData).sort() : [];
+                    const submodels = modelData ? filterVehicleKeys(modelData) : [];
+                    return ["I don't know", ...submodels];
 
                 case "chassis":
-                    const submodelData =
-                        vehicleData[selectedValues.year]?.[selectedValues.make]?.[
-                        selectedValues.model
-                        ]?.[selectedValues.submodel];
-                    return submodelData ? Object.keys(submodelData).sort() : [];
+                    const submodel = selectedValues.submodel;
+
+                    if (submodel === "I don't know") {
+                        // Collect chassis from all submodels
+                        const modelData = vehicleData[selectedValues.year]?.[selectedValues.make]?.[selectedValues.model];
+                        const allChassis = collectAllOptions(modelData, 1); // 1 level deep from submodel
+                        return ["I don't know", ...allChassis];
+                    } else {
+                        const submodelData =
+                            vehicleData[selectedValues.year]?.[selectedValues.make]?.[
+                            selectedValues.model
+                            ]?.[submodel];
+                        const chassis = submodelData ? filterVehicleKeys(submodelData) : [];
+                        return ["I don't know", ...chassis];
+                    }
 
                 case "engine":
-                    const chassisData =
-                        vehicleData[selectedValues.year]?.[selectedValues.make]?.[
-                        selectedValues.model
-                        ]?.[selectedValues.submodel]?.[selectedValues.chassis];
-                    return chassisData ? Object.keys(chassisData).sort() : [];
+                    const chassis = selectedValues.chassis;
+                    const submodelForEngine = selectedValues.submodel;
+
+                    if (submodelForEngine === "I don't know" || chassis === "I don't know") {
+                        // Collect engines from all possible paths
+                        const modelData = vehicleData[selectedValues.year]?.[selectedValues.make]?.[selectedValues.model];
+                        let targetLevel = 2; // 2 levels deep from submodel (submodel -> chassis -> engine)
+
+                        if (submodelForEngine !== "I don't know" && chassis === "I don't know") {
+                            // We know submodel but not chassis, collect from specific submodel
+                            const submodelData = modelData?.[submodelForEngine];
+                            targetLevel = 1; // 1 level deep from chassis
+                            const allEngines = collectAllOptions(submodelData, targetLevel);
+                            return ["I don't know", ...allEngines];
+                        } else {
+                            // We don't know submodel, collect from entire model
+                            const allEngines = collectAllOptions(modelData, targetLevel);
+                            return ["I don't know", ...allEngines];
+                        }
+                    } else {
+                        const chassisData =
+                            vehicleData[selectedValues.year]?.[selectedValues.make]?.[
+                            selectedValues.model
+                            ]?.[submodelForEngine]?.[chassis];
+                        const engines = chassisData ? filterVehicleKeys(chassisData) : [];
+                        return ["I don't know", ...engines];
+                    }
 
                 case "transmission":
-                    const engineData =
-                        vehicleData[selectedValues.year]?.[selectedValues.make]?.[
-                        selectedValues.model
-                        ]?.[selectedValues.submodel]?.[selectedValues.chassis]?.[
-                        selectedValues.engine
-                        ];
-                    return Array.isArray(engineData) ? engineData.sort() : [];
+                    const engineForTrans = selectedValues.engine;
+                    const chassisForTrans = selectedValues.chassis;
+                    const submodelForTrans = selectedValues.submodel;
+
+                    if (submodelForTrans === "I don't know" || chassisForTrans === "I don't know" || engineForTrans === "I don't know") {
+                        // Collect transmissions from all possible paths
+                        const modelData = vehicleData[selectedValues.year]?.[selectedValues.make]?.[selectedValues.model];
+                        const allTransmissions = new Set();
+
+                        // Recursively collect all transmission arrays
+                        function collectTransmissions(data) {
+                            if (Array.isArray(data)) {
+                                data.forEach(trans => allTransmissions.add(trans));
+                            } else if (data && typeof data === 'object') {
+                                Object.keys(data).forEach(key => {
+                                    if (key !== 'redirectUrls') {
+                                        collectTransmissions(data[key]);
+                                    }
+                                });
+                            }
+                        }
+
+                        collectTransmissions(modelData);
+                        return ["I don't know", ...Array.from(allTransmissions).sort()];
+                    } else {
+                        const engineData =
+                            vehicleData[selectedValues.year]?.[selectedValues.make]?.[
+                            selectedValues.model
+                            ]?.[submodelForTrans]?.[chassisForTrans]?.[engineForTrans];
+                        const transmissions = Array.isArray(engineData) ? engineData : [];
+                        return ["I don't know", ...transmissions.sort()];
+                    }
 
                 default:
                     return [];
@@ -1137,7 +1223,7 @@ function initVehicleSelector(config = {}) {
 
     function generateRedirectURL(vehicleConfig) {
         const { year, make, model, submodel, chassis, engine, transmission } = vehicleConfig;
-        
+
         // Validate minimum requirements
         if (!year || !make || !model) {
             const error = 'Cannot generate redirect URL: Year, Make, and Model are required';
@@ -1147,53 +1233,53 @@ function initVehicleSelector(config = {}) {
             }
             return null;
         }
-        
+
         try {
             // Find the vehicle in our data to get the redirect URL
             const yearData = vehicleData[year];
             if (!yearData) throw new Error(`Year ${year} not found in vehicle data`);
-            
+
             const makeData = yearData[make];
             if (!makeData) throw new Error(`Make ${make} not found for year ${year}`);
-            
+
             const modelData = makeData[model];
             if (!modelData) throw new Error(`Model ${model} not found for ${year} ${make}`);
-            
+
             // Look for redirectUrls - first check at submodel level, then model level
             let redirectUrls = modelData.redirectUrls;
-            
+
             if (submodel && modelData[submodel] && modelData[submodel].redirectUrls) {
                 // Use more specific submodel URLs if available
                 redirectUrls = { ...redirectUrls, ...modelData[submodel].redirectUrls };
             }
-            
+
             if (!redirectUrls) {
                 throw new Error(`No redirect URLs found for ${year} ${make} ${model}`);
             }
-            
+
             // Get the appropriate URL based on context
             const urlContext = customActions.urlContext || 'default';
             let baseUrl = redirectUrls[urlContext] || redirectUrls.default;
-            
+
             if (!baseUrl) {
                 throw new Error(`No URL found for context '${urlContext}' in ${year} ${make} ${model}`);
             }
-            
+
             // Ensure baseUrl ends with /
             if (!baseUrl.endsWith('/')) {
                 baseUrl += '/';
             }
-            
+
             // Build query parameters
             const params = new URLSearchParams();
-            
+
             // Add vehicle params (skip "I don't know" values)
             if (year && year !== "I don't know") params.append('year', year);
             if (submodel && submodel !== "I don't know") params.append('submodel', submodel);
             if (chassis && chassis !== "I don't know") params.append('chassis', chassis);
             if (engine && engine !== "I don't know") params.append('engine', engine);
             if (transmission && transmission !== "I don't know") params.append('transmission', transmission);
-            
+
             // Add custom parameters
             if (buttonUrlRef) {
                 // Handle both simple strings and URL-encoded parameters
@@ -1208,20 +1294,20 @@ function initVehicleSelector(config = {}) {
                     params.append('ref', buttonUrlRef);
                 }
             }
-            
+
             // Combine URL and parameters
             const queryString = params.toString();
             return queryString ? `${baseUrl}?${queryString}` : baseUrl;
-            
+
         } catch (error) {
             const errorMessage = `URL generation failed: ${error.message}`;
             console.error(errorMessage);
             if (typeof onError === 'function') {
-                onError({ 
-                    type: 'url_generation', 
-                    message: errorMessage, 
+                onError({
+                    type: 'url_generation',
+                    message: errorMessage,
                     config: vehicleConfig,
-                    originalError: error 
+                    originalError: error
                 });
             }
             return null;
@@ -1347,7 +1433,7 @@ function initVehicleSelector(config = {}) {
         updateButtonConfig: (newConfig) => {
             // Update the customActions object
             Object.assign(customActions, newConfig);
-            
+
             // Update extracted variables
             if (newConfig.buttonText !== undefined) buttonText = newConfig.buttonText;
             if (newConfig.compatibleVehicles !== undefined) compatibleVehicles = newConfig.compatibleVehicles;
@@ -1355,7 +1441,7 @@ function initVehicleSelector(config = {}) {
             if (newConfig.buttonUrlRef !== undefined) buttonUrlRef = newConfig.buttonUrlRef;
             if (newConfig.buttonUrlCategory !== undefined) buttonUrlCategory = newConfig.buttonUrlCategory;
             if (newConfig.urlContext !== undefined) urlContext = newConfig.urlContext;
-            
+
             // Re-evaluate button state with new config
             const isComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
             if (isComplete) {
