@@ -2,9 +2,6 @@ function initVehicleSelector(config = {}) {
     // Configuration with defaults
     const {
         formId = "vehicle-selector-form",
-        dropdownId = "vehicle-selector-dropdown",
-        summaryId = "vehicle-selector-complete-summary",
-        intermediarySummaryId = "vehicle-selector-intermediary-summary",
         fieldNames = ["year", "make", "model", "submodel", "chassis", "engine", "transmission"],
         onComplete = null,
         onReset = null,
@@ -17,7 +14,7 @@ function initVehicleSelector(config = {}) {
     const {
         buttonText = "Browse Parts",
         compatibleVehicles = [],
-        buttonVisibility = "always",
+        buttonVisibility = "always", // always | never | conditionally
         buttonUrlRef = "",
         buttonUrlCategory = "",
         urlContext = "default"
@@ -26,16 +23,16 @@ function initVehicleSelector(config = {}) {
     // Cache all DOM elements once at initialization - Performance optimization
     const elements = {
         form: document.getElementById(formId),
-        dropdown: document.getElementById(dropdownId),
+        dropdown: document.getElementById("vehicle-selector-dropdown"),
         dropdownBox: null, // Will be set after dropdown check
-        summaryElement: document.getElementById(summaryId),
-        intermediarySummaryElement: document.getElementById(intermediarySummaryId),
-        steps: document.querySelectorAll(".vehicle-selector-step"), // Updated selector
+        summaryElement: document.getElementById("vehicle-selector-complete-summary"),
+        intermediarySummaryElement: document.getElementById("vehicle-selector-intermediary-summary"),
+        steps: document.querySelectorAll(".vehicle-selector-step"),
         navArrows: document.querySelectorAll(".vehicle-selector-nav-arrow"),
+        actionButton: document.querySelector(".vehicle-selector-button"),
         inputs: fieldNames.map((name) =>
             document.querySelector(`[name="${name}"]`)
-        ),
-        actionButton: document.querySelector(".vehicle-selector-button")
+        )
     };
 
     // Early return with better error handling
@@ -513,7 +510,15 @@ function initVehicleSelector(config = {}) {
             const link = document.createElement("a");
             link.href = "#";
             link.className = "dropdown-link-2";
-            if (index === 0) link.classList.add("selected");
+
+            // Select second option by default if first option is "I don't know"
+            const shouldSelect = (options[0] === "I don't know" && index === 1) ||
+                (options[0] !== "I don't know" && index === 0);
+
+            if (shouldSelect) {
+                link.classList.add("selected");
+            }
+
             link.textContent = option;
             elements.dropdownBox.appendChild(link);
         });
@@ -987,17 +992,17 @@ function initVehicleSelector(config = {}) {
         const parts = fieldNames
             .map(fieldName => selectedValues[fieldName])
             .filter(value => value && value !== "I don't know");
-        
+
         elements.summaryElement.textContent = parts.join(", ");
-        
+
         // Check if all required fields are completed (including "I don't know" as valid)
         const isComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
-        
+
         if (isComplete) {
             // Generate redirect URL and match type
             const redirectURL = generateRedirectURL(selectedValues);
             const matchType = getVehicleMatchType(selectedValues);
-            
+
             // Update button visibility and properties
             if (redirectURL) {
                 updateButtonVisibility(matchType);
@@ -1008,7 +1013,7 @@ function initVehicleSelector(config = {}) {
                     elements.actionButton.classList.add("hidden");
                 }
             }
-            
+
             // Trigger onComplete callback
             if (typeof onComplete === 'function' && !skipOnComplete) {
                 try {
@@ -1017,7 +1022,7 @@ function initVehicleSelector(config = {}) {
                         summary: parts.join(", "), // Summary without "I don't know"
                         redirectURL: redirectURL,
                         matchType: matchType,
-                        reset: () => handleResetSelection({ preventDefault: () => {} }),
+                        reset: () => handleResetSelection({ preventDefault: () => { } }),
                         getState: () => ({ ...selectedValues })
                     });
                 } catch (error) {
@@ -1030,13 +1035,13 @@ function initVehicleSelector(config = {}) {
     // Update intermediary summary (first 4 fields) in step 2
     function updateIntermediarySummary() {
         if (!elements.intermediarySummaryElement) return;
-        
+
         // Get first 4 field values (Year, Make, Model, Submodel) and filter out "I don't know"
         const intermediaryFields = fieldNames.slice(0, 4);
         const parts = intermediaryFields
             .map(fieldName => selectedValues[fieldName])
             .filter(value => value && value !== "I don't know");
-        
+
         if (parts.length > 0) {
             elements.intermediarySummaryElement.textContent = parts.join(' ');
         } else {
@@ -1434,7 +1439,7 @@ function initVehicleSelector(config = {}) {
         reset: (skipCallback = false) => handleResetSelection({ preventDefault: () => { } }, skipCallback),
         setupInitialState: setupInitialState,
         getState: () => ({ ...selectedValues }),
-        getConfig: () => ({ formId, dropdownId, summaryId, intermediarySummaryId, fieldNames }),
+        getConfig: () => ({ formId, fieldNames, customActions }),
         updateData: (newData) => {
             Object.assign(vehicleData, newData);
         },
