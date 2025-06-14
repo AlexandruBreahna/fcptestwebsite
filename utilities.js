@@ -540,13 +540,13 @@ function initVehicleSelector(config = {}) {
 
         const rect = input.getBoundingClientRect();
         const formRect = elements.form.getBoundingClientRect();
-        const dropdownWidth = 260; // From CSS: width: 260px
+        const dropdownWidth = elements.dropdown.offsetWidth;
 
         // Center the dropdown under the input field
         const inputCenter = rect.left + (rect.width / 2);
         const dropdownLeft = inputCenter - (dropdownWidth / 2);
 
-        // Adjust relative to form position
+        // Calculate position relative to form
         const leftPosition = dropdownLeft - formRect.left;
 
         elements.dropdown.style.left = `${leftPosition}px`;
