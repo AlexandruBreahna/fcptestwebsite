@@ -2,14 +2,25 @@ function initVehicleSelector(config = {}) {
     // Configuration with defaults
     const {
         formId = "vehicle-selector-form",
-        dropdownId = "vehicle-selector-dropdown", 
+        dropdownId = "vehicle-selector-dropdown",
         summaryId = "vehicle-selector-complete-summary",
         intermediarySummaryId = "vehicle-selector-intermediary-summary",
         fieldNames = ["year", "make", "model", "submodel", "chassis", "engine", "transmission"],
-        onComplete = null, // Callback function when vehicle configuration is complete
-        onReset = null, // Callback function when vehicle selector is reset
-        vehicleData = window.carData || {}
+        onComplete = null,
+        onReset = null,
+        onError = null,
+        vehicleData = window.carData || {},
+        customActions = {}
     } = config;
+
+    // Extract customActions with defaults
+    const {
+        buttonText = "Browse Parts",
+        compatibleVehicles = [],
+        buttonVisibility = "always",
+        buttonUrlRef = "",
+        buttonUrlCategory = ""
+    } = customActions;
 
     // Cache all DOM elements once at initialization - Performance optimization
     const elements = {
@@ -22,7 +33,8 @@ function initVehicleSelector(config = {}) {
         navArrows: document.querySelectorAll(".vehicle-selector-nav-arrow"),
         inputs: fieldNames.map((name) =>
             document.querySelector(`[name="${name}"]`)
-        )
+        ),
+        actionButton: document.querySelector(".vehicle-selector-button")
     };
 
     // Early return with better error handling
@@ -84,6 +96,21 @@ function initVehicleSelector(config = {}) {
                 step.classList.add("hidden");
             }
         });
+
+        // Initialize button state
+        if (elements.actionButton) {
+            elements.actionButton.textContent = buttonText;
+
+            // Set initial visibility based on configuration
+            if (buttonVisibility === "never") {
+                elements.actionButton.classList.add("hidden");
+            } else if (buttonVisibility === "always") {
+                elements.actionButton.classList.remove("hidden");
+            } else {
+                // For "compatibility", start hidden until vehicle is configured
+                elements.actionButton.classList.add("hidden");
+            }
+        }
     }
 
     // Attach all event listeners using event delegation
@@ -164,36 +191,36 @@ function initVehicleSelector(config = {}) {
         // Handle navigation arrows
         const navArrow = event.target.closest(".vehicle-selector-nav-arrow");
         if (navArrow) {
-        event.preventDefault();
-        
-        // Check if arrow is disabled
-        if (navArrow.classList.contains("disabled")) {
+            event.preventDefault();
+
+            // Check if arrow is disabled
+            if (navArrow.classList.contains("disabled")) {
+                return;
+            }
+
+            const isForward = navArrow.classList.contains("nav-forward");
+            const isBackward = navArrow.classList.contains("nav-backwards");
+
+            if (isForward) {
+                navigateForward();
+            } else if (isBackward) {
+                navigateBackward();
+            }
             return;
         }
-    
-        const isForward = navArrow.classList.contains("nav-forward");
-        const isBackward = navArrow.classList.contains("nav-backwards");
-    
-        if (isForward) {
-            navigateForward();
-        } else if (isBackward) {
-            navigateBackward();
-        }
-        return;
-        }
-    
+
         // Handle reset button
         const resetButton = event.target.closest(".vehicle-selector-reset-selection");
         if (resetButton) {
-        handleResetSelection(event);
-        return;
+            handleResetSelection(event);
+            return;
         }
-    
+
         // Handle clear buttons
         const clearButton = event.target.closest(".vs-clear-selection");
         if (clearButton) {
-        handleClearSelection(event);
-        return;
+            handleClearSelection(event);
+            return;
         }
     }
 
@@ -698,14 +725,14 @@ function initVehicleSelector(config = {}) {
     // Handle reset selection clicks - reset entire selector and trigger onReset callback
     function handleResetSelection(event, skipCallback = false) {
         event.preventDefault();
-        
+
         // Store previous values before clearing (for callback)
         const previousValues = { ...selectedValues };
         const wasPreviouslyComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
-        
+
         // Clear all selected values
         selectedValues = {};
-        
+
         // Clear summary
         if (elements.summaryElement) {
             elements.summaryElement.textContent = "Your complete vehicle configuration";
@@ -715,11 +742,11 @@ function initVehicleSelector(config = {}) {
         if (elements.intermediarySummaryElement) {
             elements.intermediarySummaryElement.textContent = "Year, Make, Model and Submodel";
         }
-        
+
         // Reset all input fields
         elements.inputs.forEach((input, index) => {
             if (!input) return;
-            
+
             input.value = "";
             const group = input.closest(".vehicle-selector-input-group");
             if (group) {
@@ -736,15 +763,15 @@ function initVehicleSelector(config = {}) {
                 }
             }
         });
-        
+
         // Hide dropdown and puck
         hideDropdown();
         hidePuck();
-        
+
         // Reset to first step
         currentStep = 0;
         currentFieldIndex = 0;
-        
+
         elements.steps.forEach((step, index) => {
             if (index === 0) {
                 step.classList.remove("hidden");
@@ -752,17 +779,17 @@ function initVehicleSelector(config = {}) {
                 step.classList.add("hidden");
             }
         });
-        
+
         // Focus on the first field
         if (elements.inputs[0]) {
             elements.inputs[0].focus();
             showDropdownForField(0);
             updatePuck(0);
         }
-        
+
         // Update navigation arrows
         updateNavigationArrows();
-        
+
         // Trigger onReset callback if configured and not skipped
         if (typeof onReset === 'function' && !skipCallback && wasPreviouslyComplete) {
             try {
@@ -776,7 +803,7 @@ function initVehicleSelector(config = {}) {
                 console.error('Error in vehicle selector reset callback:', error);
             }
         }
-        
+
         console.log('Vehicle selector reset to initial state');
     }
 
@@ -868,21 +895,40 @@ function initVehicleSelector(config = {}) {
 
         const parts = fieldNames.map(fieldName => selectedValues[fieldName]).filter(Boolean);
         elements.summaryElement.textContent = parts.join(", ");
-        
-        // Check if all required fields are completed and onComplete should be triggered
+
+        // Check if all required fields are completed
         const isComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
-        
-        if (isComplete && typeof onComplete === 'function' && !skipOnComplete) {
-            // Call the completion callback with the selected values
-            try {
-                onComplete({
-                    values: { ...selectedValues },
-                    summary: parts.join(", "),
-                    reset: () => handleResetSelection({ preventDefault: () => {} }), // Provide reset function
-                    getState: () => ({ ...selectedValues })
-                });
-            } catch (error) {
-                console.error('Error in vehicle selector completion callback:', error);
+
+        if (isComplete) {
+            // Generate redirect URL and match type
+            const redirectURL = generateRedirectURL(selectedValues);
+            const matchType = getVehicleMatchType(selectedValues);
+
+            // Update button visibility and properties
+            if (redirectURL) {
+                updateButtonVisibility(matchType);
+                updateButtonProperties(redirectURL);
+            } else {
+                // Hide button if URL generation failed
+                if (elements.actionButton) {
+                    elements.actionButton.classList.add("hidden");
+                }
+            }
+
+            // Trigger onComplete callback
+            if (typeof onComplete === 'function' && !skipOnComplete) {
+                try {
+                    onComplete({
+                        values: { ...selectedValues },
+                        summary: parts.join(", "),
+                        redirectURL: redirectURL,
+                        matchType: matchType,
+                        reset: () => handleResetSelection({ preventDefault: () => { } }),
+                        getState: () => ({ ...selectedValues })
+                    });
+                } catch (error) {
+                    console.error('Error in vehicle selector completion callback:', error);
+                }
             }
         }
     }
@@ -890,11 +936,11 @@ function initVehicleSelector(config = {}) {
     // Update intermediary summary (first 4 fields) in step 2
     function updateIntermediarySummary() {
         if (!elements.intermediarySummaryElement) return;
-        
+
         // Get first 4 field values (Year, Make, Model, Submodel)
         const intermediaryFields = fieldNames.slice(0, 4);
         const parts = intermediaryFields.map(fieldName => selectedValues[fieldName]).filter(Boolean);
-        
+
         if (parts.length > 0) {
             elements.intermediarySummaryElement.textContent = parts.join(' ');
         } else {
@@ -967,25 +1013,25 @@ function initVehicleSelector(config = {}) {
 
     // Set vehicle configuration programmatically
     function setVehicleConfiguration(vehicleConfig, options = {}) {
-        const { 
-            triggerCallbacks = false, 
+        const {
+            triggerCallbacks = false,
             focusOnComplete = true,
-            validateData = true 
+            validateData = true
         } = options;
-        
+
         try {
             // Validate configuration if requested
             if (validateData && !isValidVehicleConfiguration(vehicleConfig)) {
                 console.error('Invalid vehicle configuration provided:', vehicleConfig);
                 return false;
             }
-            
+
             // Reset to initial state first
-            handleResetSelection({ preventDefault: () => {} }, true); // Skip callback during reset
-            
+            handleResetSelection({ preventDefault: () => { } }, true); // Skip callback during reset
+
             // Set values in the correct order
             let lastStepFieldIndex = -1;
-            
+
             fieldNames.forEach((fieldName, index) => {
                 if (vehicleConfig[fieldName]) {
                     const input = elements.inputs[index];
@@ -993,26 +1039,26 @@ function initVehicleSelector(config = {}) {
                         // Set the value
                         input.value = vehicleConfig[fieldName];
                         selectedValues[fieldName] = vehicleConfig[fieldName];
-                        
+
                         // Mark field as completed
                         const group = input.closest(".vehicle-selector-input-group");
                         if (group) {
                             group.classList.add("completed");
                             group.classList.remove("active", "disabled");
                         }
-                        
+
                         lastStepFieldIndex = index;
                     }
                 }
             });
-            
+
             // Update intermediary summary if we have first 4 fields
             updateIntermediarySummary();
-            
+
             // Switch to appropriate question step
             if (lastStepFieldIndex >= 0) {
                 const isComplete = fieldNames.every(fieldName => vehicleConfig[fieldName]);
-                
+
                 if (isComplete) {
                     // All fields complete - go to summary
                     switchToStep(2);
@@ -1027,20 +1073,35 @@ function initVehicleSelector(config = {}) {
                     } else {
                         switchToStep(2);
                     }
-                    
+
                     // Enable and focus the next field
                     if (nextFieldIndex < elements.inputs.length && focusOnComplete) {
                         enableField(nextFieldIndex);
                     }
                 }
             }
-            
+
             // Update navigation arrows
             updateNavigationArrows();
-            
+
+            // Handle button updates for programmatic configuration
+            if (lastSetFieldIndex >= 0) {
+                const isComplete = fieldNames.every(fieldName => vehicleConfig[fieldName]);
+
+                if (isComplete) {
+                    const redirectURL = generateRedirectURL(selectedValues);
+                    const matchType = getVehicleMatchType(selectedValues);
+
+                    if (redirectURL) {
+                        updateButtonVisibility(matchType);
+                        updateButtonProperties(redirectURL);
+                    }
+                }
+            }
+
             console.log('Vehicle configuration set successfully:', vehicleConfig);
             return true;
-            
+
         } catch (error) {
             console.error('Error setting vehicle configuration:', error);
             return false;
@@ -1050,27 +1111,141 @@ function initVehicleSelector(config = {}) {
     // Validate vehicle configuration object
     function isValidVehicleConfiguration(config) {
         if (!config || typeof config !== 'object') return false;
-        
+
         // Check if at least one field is provided
-        const hasValidFields = fieldNames.some(fieldName => 
+        const hasValidFields = fieldNames.some(fieldName =>
             config[fieldName] && typeof config[fieldName] === 'string'
         );
-        
+
         if (!hasValidFields) return false;
-        
+
         // Validate sequential dependency (can't have model without make, etc.)
         const providedFields = fieldNames.filter(fieldName => config[fieldName]);
         for (let i = 0; i < providedFields.length - 1; i++) {
             const currentFieldIndex = fieldNames.indexOf(providedFields[i]);
             const nextFieldIndex = fieldNames.indexOf(providedFields[i + 1]);
-            
+
             if (nextFieldIndex !== currentFieldIndex + 1) {
                 console.warn('Vehicle configuration has gaps in field sequence');
                 return false;
             }
         }
-        
+
         return true;
+    }
+
+    function generateRedirectURL(vehicleConfig) {
+        const { year, make, model, submodel, chassis, engine, transmission } = vehicleConfig;
+
+        // Validate minimum requirements
+        if (!year || !make || !model) {
+            const error = 'Cannot generate redirect URL: Year, Make, and Model are required';
+            console.error(error);
+            if (typeof onError === 'function') {
+                onError({ type: 'url_generation', message: error, config: vehicleConfig });
+            }
+            return null;
+        }
+
+        // Build base URL
+        let baseUrl = `/parts/${make.toLowerCase()}/${model.toLowerCase()}`;
+        if (buttonUrlCategory) {
+            baseUrl += `/${buttonUrlCategory}`;
+        }
+        baseUrl += '/';
+
+        // Build query parameters
+        const params = new URLSearchParams();
+
+        // Add vehicle params (skip "I don't know" values)
+        if (year && year !== "I don't know") params.append('year', year);
+        if (submodel && submodel !== "I don't know") params.append('submodel', submodel);
+        if (chassis && chassis !== "I don't know") params.append('chassis', chassis);
+        if (engine && engine !== "I don't know") params.append('engine', engine);
+        if (transmission && transmission !== "I don't know") params.append('transmission', transmission);
+
+        // Add custom ref parameter
+        if (buttonUrlRef) params.append('ref', buttonUrlRef);
+
+        // Combine URL and parameters
+        const queryString = params.toString();
+        return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+    }
+
+    function getVehicleMatchType(vehicleConfig) {
+        if (!compatibleVehicles || compatibleVehicles.length === 0) {
+            return "none"; // No compatible vehicles defined
+        }
+
+        const { year, make, model, submodel, chassis, engine, transmission } = vehicleConfig;
+
+        for (const compatible of compatibleVehicles) {
+            // Check if year, make, model match
+            const basicMatch =
+                compatible.year === year &&
+                compatible.make === make &&
+                compatible.model === model;
+
+            if (!basicMatch) continue;
+
+            // If basic match found, check for perfect match
+            const perfectMatch =
+                basicMatch &&
+                compatible.submodel === submodel &&
+                compatible.chassis === chassis &&
+                compatible.engine === engine &&
+                compatible.transmission === transmission;
+
+            if (perfectMatch) return "perfect";
+
+            // If we have basic match but not perfect, it's partial
+            return "partial";
+        }
+
+        return "none"; // No matches found
+    }
+
+    function updateButtonVisibility(matchType) {
+        if (!elements.actionButton) return;
+
+        let shouldShow = false;
+
+        switch (buttonVisibility) {
+            case "always":
+                shouldShow = true;
+                break;
+            case "never":
+                shouldShow = false;
+                break;
+            case "compatibility":
+                shouldShow = matchType === "none" || matchType === "partial";
+                break;
+        }
+
+        if (shouldShow) {
+            elements.actionButton.classList.remove("hidden");
+        } else {
+            elements.actionButton.classList.add("hidden");
+        }
+    }
+
+    function updateButtonProperties(redirectURL) {
+        if (!elements.actionButton) return;
+
+        // Update button text
+        if (buttonText) {
+            elements.actionButton.textContent = buttonText;
+        }
+
+        // Update href if button is an anchor tag
+        if (redirectURL && elements.actionButton.tagName.toLowerCase() === 'a') {
+            elements.actionButton.href = redirectURL;
+        }
+
+        // Store URL as data attribute for other use cases
+        if (redirectURL) {
+            elements.actionButton.setAttribute('data-redirect-url', redirectURL);
+        }
     }
 
     // Initialize the selector
@@ -1105,13 +1280,25 @@ function initVehicleSelector(config = {}) {
             cleanup.clearTimers();
             selectedValues = {};
         },
-        reset: (skipCallback = false) => handleResetSelection({ preventDefault: () => {} }, skipCallback),
+        reset: (skipCallback = false) => handleResetSelection({ preventDefault: () => { } }, skipCallback),
         setupInitialState: setupInitialState,
         getState: () => ({ ...selectedValues }),
         getConfig: () => ({ formId, dropdownId, summaryId, intermediarySummaryId, fieldNames }),
         updateData: (newData) => {
             Object.assign(vehicleData, newData);
         },
-        setConfiguration: setVehicleConfiguration
+        setConfiguration: setVehicleConfiguration,
+        updateButtonConfig: (newConfig) => {
+            Object.assign(customActions, newConfig);
+            const isComplete = fieldNames.every(fieldName => selectedValues[fieldName]);
+            if (isComplete) {
+                const redirectURL = generateRedirectURL(selectedValues);
+                const matchType = getVehicleMatchType(selectedValues);
+                if (redirectURL) {
+                    updateButtonVisibility(matchType);
+                    updateButtonProperties(redirectURL);
+                }
+            }
+        }
     };
 }
