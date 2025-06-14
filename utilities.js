@@ -332,14 +332,19 @@ function initVehicleSelector(config = {}) {
     function showDropdownForField(index) {
         const options = getOptionsForField(index);
         populateDropdown(options);
-        positionDropdown(elements.inputs[index]);
 
-        // Add smooth fade-in effect
+        // Make dropdown visible but transparent
         elements.dropdown.style.display = "block";
         elements.dropdown.style.opacity = "0";
         elements.dropdown.style.transform = "translateY(-10px)";
-
-        // Trigger animation
+        
+        // Force a reflow to ensure dimensions are calculated
+        elements.dropdown.offsetHeight; // Reading offsetHeight forces layout
+        
+        // Now position with correct dimensions
+        positionDropdown(elements.inputs[index]);
+        
+        // Then animate in
         requestAnimationFrame(() => {
             elements.dropdown.style.transition = "opacity 0.2s ease, transform 0.2s ease";
             elements.dropdown.style.opacity = "1";
