@@ -40,7 +40,7 @@ function initVehicleSelector(config = {}) {
     // Current state
     let currentFieldIndex = 0;
     let selectedValues = {};
-    let currentQuestionSet = 0;
+    let currentStep = 0;
     let debounceTimer = null;
     let focusTimer = null;
 
@@ -486,26 +486,26 @@ function initVehicleSelector(config = {}) {
             updateIntermediarySummary();
         }
 
-        // Progress to next field or question set - immediate progression for smooth flow
+        // Progress to next field or question step - immediate progression for smooth flow
         progressToNextField(fieldIndex);
         updateNavigationArrows();
     }
 
-    // Progress to the next field or question set
+    // Progress to the next field or question step
     function progressToNextField(currentIndex) {
-        // Check if we need to auto-advance to next question set
+        // Check if we need to auto-advance to next step
         if (currentIndex === 3) {
             // After submodel (4th field) - auto-advance to Step 2
-            switchToQuestionSet(1);
+            switchToStep(1);
         } else if (currentIndex === 6) {
             // After transmission (7th field) - auto-advance to Step 3
-            switchToQuestionSet(2);
+            switchToStep(2);
             generateSummary();
         } else if (currentIndex < elements.inputs.length - 1) {
-            // Enable next field within current question set
+            // Enable next field within current step
             const nextIndex = currentIndex + 1;
-            const currentSetFields = getCurrentQuestionSetFields();
-            if (currentSetFields.includes(nextIndex)) {
+            const currentStepFields = getCurrentStepFields();
+            if (currentStepFields.includes(nextIndex)) {
                 enableField(nextIndex);
             }
         }
@@ -514,21 +514,21 @@ function initVehicleSelector(config = {}) {
         updateNavigationArrows();
     }
 
-    // Get field indices for current question set
-    function getCurrentQuestionSetFields() {
+    // Get field indices for current step
+    function getCurrentStepFields() {
         const fieldRanges = [
             [0, 1, 2, 3], // Step 1: Year, Make, Model, Submodel
             [4, 5, 6], // Step 2: Chassis, Engine, Transmission
             [] // Step 3: Summary only
         ];
-        return fieldRanges[currentQuestionSet] || [];
+        return fieldRanges[currentStep] || [];
     }
 
-    // Switch between question sets
-    function switchToQuestionSet(setIndex) {
-        currentQuestionSet = setIndex;
+    // Switch between question steps
+    function switchToStep(stepIndex) {
+        currentStep = stepIndex;
 
-        // Hide dropdown when navigating between question sets
+        // Hide dropdown when navigating between question steps
         hideDropdown();
 
         // Remove focus from any currently focused input to ensure dropdown stays closed
@@ -537,19 +537,19 @@ function initVehicleSelector(config = {}) {
             currentlyFocused.blur();
         }
 
-        // Hide puck in all question sets
+        // Hide puck in all question steps
         hidePuck();
 
         // Hide all steps
         elements.steps.forEach((step) => step.classList.add("hidden"));
 
         // Show target step
-        if (elements.steps[setIndex]) {
-            elements.steps[setIndex].classList.remove("hidden");
+        if (elements.steps[stepIndex]) {
+            elements.steps[stepIndex].classList.remove("hidden");
         }
 
         // Update intermediary summary when showing step 2
-        if (setIndex === 1) {
+        if (stepIndex === 1) {
             updateIntermediarySummary();
         }
 
@@ -560,18 +560,18 @@ function initVehicleSelector(config = {}) {
             [] // Step 3 (summary only)
         ];
 
-        const fieldsForSet = setFieldRanges[setIndex] || [];
-        if (fieldsForSet.length > 0) {
+        const fieldsForStep = setFieldRanges[stepIndex] || [];
+        if (fieldsForStep.length > 0) {
             // For automatic progression, enable first field of new set
             // For manual navigation, find first incomplete field
             let fieldToEnable;
 
-            if (setIndex === 1 && fieldsForSet.includes(4)) {
+            if (stepIndex === 1 && fieldsForStep.includes(4)) {
                 // Auto-progressing to Step 2 - always start with chassis (index 4)
                 fieldToEnable = 4;
             } else {
                 // Manual navigation - find first incomplete field
-                fieldToEnable = fieldsForSet.find(
+                fieldToEnable = fieldsForStep.find(
                     (index) => !selectedValues[fieldNames[index]]
                 );
             }
@@ -580,7 +580,7 @@ function initVehicleSelector(config = {}) {
                 enableField(fieldToEnable);
             }
         } else {
-            // No fields in this question set (like the summary page) - ensure no field has focus
+            // No fields in this question step (like the summary page) - ensure no field has focus
             currentFieldIndex = -1;
         }
 
@@ -679,13 +679,13 @@ function initVehicleSelector(config = {}) {
         // Reset to appropriate question set based on cleared field
         if (fieldIndex < 4) {
             // If clearing any field in Step 1, go back to Step 1
-            if (currentQuestionSet !== 0) {
-                switchToQuestionSet(0);
+            if (currentStep !== 0) {
+                switchToStep(0);
             }
         } else if (fieldIndex < 7) {
             // If clearing any field in Step 2, go back to Step 2
-            if (currentQuestionSet !== 1) {
-                switchToQuestionSet(1);
+            if (currentStep !== 1) {
+                switchToStep(1);
             }
         }
     }
@@ -741,8 +741,8 @@ function initVehicleSelector(config = {}) {
         hideDropdown();
         hidePuck();
         
-        // Reset to first question set
-        currentQuestionSet = 0;
+        // Reset to first step
+        currentStep = 0;
         currentFieldIndex = 0;
         
         elements.steps.forEach((step, index) => {
@@ -780,43 +780,43 @@ function initVehicleSelector(config = {}) {
         console.log('Vehicle selector reset to initial state');
     }
 
-    // Navigate to next question set
+    // Navigate to next step
     function navigateForward() {
-        if (currentQuestionSet === 0 && isQuestionSetComplete(0)) {
+        if (currentStep === 0 && isStepComplete(0)) {
             // Step 1 → Step 2
-            switchToQuestionSet(1);
-        } else if (currentQuestionSet === 1 && isQuestionSetComplete(1)) {
+            switchToStep(1);
+        } else if (currentStep === 1 && isStepComplete(1)) {
             // Step 2 → Step 3
-            switchToQuestionSet(2);
+            switchToStep(2);
             generateSummary();
         }
         // Step 3 has no forward navigation
     }
 
-    // Navigate to previous question set
+    // Navigate to previous step
     function navigateBackward() {
-        if (currentQuestionSet === 1) {
+        if (currentStep === 1) {
             // Step 2 → Step 1
-            switchToQuestionSet(0);
-        } else if (currentQuestionSet === 2) {
+            switchToStep(0);
+        } else if (currentStep === 2) {
             // Step 3 → Step 2
-            switchToQuestionSet(1);
+            switchToStep(1);
         }
         // Step 1 has no backward navigation
     }
 
-    // Check if a question set is complete - fix: correct field ranges
-    function isQuestionSetComplete(setIndex) {
+    // Check if a step is complete
+    function isStepComplete(stepIndex) {
         const fieldRanges = [
             [0, 1, 2, 3], // Step 1: indices 0,1,2,3 (year, make, model, submodel)
             [4, 5, 6], // Step 2: indices 4,5,6 (chassis, engine, transmission)
             [] // Step 3: no required fields (summary only)
         ];
 
-        const fieldsForSet = fieldRanges[setIndex] || [];
+        const fieldsForStep = fieldRanges[stepIndex] || [];
 
-        // Check if all fields in this set have values
-        for (const fieldIndex of fieldsForSet) {
+        // Check if all fields in this step have values
+        for (const fieldIndex of fieldsForStep) {
             if (!selectedValues[fieldNames[fieldIndex]]) {
                 return false;
             }
@@ -836,10 +836,10 @@ function initVehicleSelector(config = {}) {
         // Update forward arrows
         forwardArrows.forEach((arrow) => {
             const step = arrow.closest(".vehicle-selector-step");
-            const setIndex = Array.from(elements.steps).indexOf(step);
+            const stepIndex = Array.from(elements.steps).indexOf(step);
 
-            if (setIndex === currentQuestionSet) {
-                if (isQuestionSetComplete(currentQuestionSet)) {
+            if (stepIndex === currentStep) {
+                if (isStepComplete(currentStep)) {
                     arrow.classList.remove("disabled");
                 } else {
                     arrow.classList.add("disabled");
@@ -850,10 +850,10 @@ function initVehicleSelector(config = {}) {
         // Update backward arrows - always enabled except for first set
         backwardArrows.forEach((arrow) => {
             const step = arrow.closest(".vehicle-selector-step");
-            const setIndex = Array.from(elements.steps).indexOf(step);
+            const stepIndex = Array.from(elements.steps).indexOf(step);
 
-            if (setIndex === currentQuestionSet) {
-                if (currentQuestionSet === 0) {
+            if (stepIndex === currentStep) {
+                if (currentStep === 0) {
                     arrow.classList.add("disabled");
                 } else {
                     arrow.classList.remove("disabled");
@@ -927,7 +927,7 @@ function initVehicleSelector(config = {}) {
     // Update puck position and visibility
     function updatePuck(activeInputIndex) {
         // Find the current step
-        const currentStep = elements.steps[currentQuestionSet];
+        const currentStep = elements.steps[currentStep];
         if (!currentStep) return;
 
         // Find the puck in the current step
@@ -984,7 +984,7 @@ function initVehicleSelector(config = {}) {
             handleResetSelection({ preventDefault: () => {} }, true); // Skip callback during reset
             
             // Set values in the correct order
-            let lastSetFieldIndex = -1;
+            let lastStepFieldIndex = -1;
             
             fieldNames.forEach((fieldName, index) => {
                 if (vehicleConfig[fieldName]) {
@@ -1001,7 +1001,7 @@ function initVehicleSelector(config = {}) {
                             group.classList.remove("active", "disabled");
                         }
                         
-                        lastSetFieldIndex = index;
+                        lastStepFieldIndex = index;
                     }
                 }
             });
@@ -1009,23 +1009,23 @@ function initVehicleSelector(config = {}) {
             // Update intermediary summary if we have first 4 fields
             updateIntermediarySummary();
             
-            // Switch to appropriate question set
-            if (lastSetFieldIndex >= 0) {
+            // Switch to appropriate question step
+            if (lastStepFieldIndex >= 0) {
                 const isComplete = fieldNames.every(fieldName => vehicleConfig[fieldName]);
                 
                 if (isComplete) {
                     // All fields complete - go to summary
-                    switchToQuestionSet(2);
+                    switchToStep(2);
                     generateSummary(!triggerCallbacks); // Skip onComplete if requested
                 } else {
-                    // Go to the question set of the next field to be filled
-                    const nextFieldIndex = lastSetFieldIndex + 1;
+                    // Go to the step of the next field to be filled
+                    const nextFieldIndex = lastStepFieldIndex + 1;
                     if (nextFieldIndex < 4) {
-                        switchToQuestionSet(0);
+                        switchToStep(0);
                     } else if (nextFieldIndex < 7) {
-                        switchToQuestionSet(1);
+                        switchToStep(1);
                     } else {
-                        switchToQuestionSet(2);
+                        switchToStep(2);
                     }
                     
                     // Enable and focus the next field
