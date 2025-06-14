@@ -86,7 +86,7 @@ function initVehicleSelector(config = {}) {
         });
     }
 
-    // Attach all event listeners using event delegation - Performance optimization
+    // Attach all event listeners using event delegation
     function attachEventListeners() {
         // Single delegated listener for all form events
         elements.form.addEventListener("focusin", handleFormFocusIn);
@@ -117,7 +117,7 @@ function initVehicleSelector(config = {}) {
         }
     }
 
-    // Handle all blur events through delegation - reduce delay for snappier interactions
+    // Handle all blur events through delegation
     function handleFormFocusOut(event) {
         const input = event.target.closest(".vehicle-selector-input-control");
         if (input) {
@@ -159,7 +159,7 @@ function initVehicleSelector(config = {}) {
         }
     }
 
-    // Handle all click events through delegation - add reset button handling
+    // Handle all click events through delegation
     function handleFormClick(event) {
         // Handle navigation arrows
         const navArrow = event.target.closest(".vehicle-selector-nav-arrow");
@@ -197,7 +197,7 @@ function initVehicleSelector(config = {}) {
         }
     }
 
-    // Debounced input change handler - Performance optimization
+    // Debounced input change handler
     function handleInputChangeDebounced(index) {
         const input = elements.inputs[index];
         if (!input) return;
@@ -227,14 +227,7 @@ function initVehicleSelector(config = {}) {
         updatePuck(index);
     }
 
-    // Handle input changes - now handled by debounced version in event delegation
-    function handleInputChange(index) {
-        // This function is now replaced by handleInputChangeDebounced
-        // Keep for backward compatibility if called directly
-        handleInputChangeDebounced(index);
-    }
-
-    // Handle input blur - reduce delay for much snappier interactions
+    // Handle input blur
     function handleInputBlur(index) {
         // Use minimal delay to check focus state
         setTimeout(() => {
@@ -310,7 +303,7 @@ function initVehicleSelector(config = {}) {
         options[newIndex].classList.add("selected");
     }
 
-    // Show dropdown for specific field - add smooth appearance
+    // Show dropdown for specific field
     function showDropdownForField(index) {
         const options = getOptionsForField(index);
         populateDropdown(options);
@@ -422,7 +415,7 @@ function initVehicleSelector(config = {}) {
         populateDropdown(filteredOptions);
     }
 
-    // Position dropdown relative to input - fix: center the dropdown
+    // Position dropdown relative to input
     function positionDropdown(input) {
         if (!input || !elements.dropdown) return;
 
@@ -441,7 +434,7 @@ function initVehicleSelector(config = {}) {
         elements.dropdown.style.top = `${rect.bottom - formRect.top}px`;
     }
 
-    // Handle dropdown option selection - prevent blur events for smooth transitions
+    // Handle dropdown option selection
     function handleDropdownClick(event) {
         event.preventDefault();
         event.stopPropagation(); // Prevent event bubbling
@@ -462,7 +455,7 @@ function initVehicleSelector(config = {}) {
         }, 1);
     }
 
-    // Prevent dropdown interactions from causing input blur - smooth transitions
+    // Prevent dropdown interactions from causing input blur
     function preventDropdownBlur(event) {
         // Prevent mousedown on dropdown from stealing focus
         event.preventDefault();
@@ -593,7 +586,7 @@ function initVehicleSelector(config = {}) {
         updatePuck(index);
     }
 
-    // Handle clear selection clicks - fix: work with event delegation
+    // Handle clear input selection clicks
     function handleClearSelection(event) {
         event.preventDefault();
 
@@ -892,7 +885,7 @@ function initVehicleSelector(config = {}) {
         }
     }
 
-    // Update puck position and visibility - immediate execution for instant response
+    // Update puck position and visibility
     function updatePuck(activeInputIndex) {
         // Find the current question set
         const currentSet = elements.questionSets[currentQuestionSet];
@@ -933,8 +926,122 @@ function initVehicleSelector(config = {}) {
         });
     }
 
+    // Set vehicle configuration programmatically
+    function setVehicleConfiguration(vehicleConfig, options = {}) {
+        const { 
+            triggerCallbacks = false, 
+            focusOnComplete = true,
+            validateData = true 
+        } = options;
+        
+        try {
+            // Validate configuration if requested
+            if (validateData && !isValidVehicleConfiguration(vehicleConfig)) {
+                console.error('Invalid vehicle configuration provided:', vehicleConfig);
+                return false;
+            }
+            
+            // Store current state for potential rollback
+            const previousValues = { ...selectedValues };
+            const previousQuestionSet = currentQuestionSet;
+            const previousFieldIndex = currentFieldIndex;
+            
+            // Reset to initial state first
+            handleResetSelection({ preventDefault: () => {} }, true); // Skip callback during reset
+            
+            // Set values in the correct order
+            let lastSetFieldIndex = -1;
+            let targetQuestionSet = 0;
+            
+            fieldNames.forEach((fieldName, index) => {
+                if (vehicleConfig[fieldName]) {
+                    const input = elements.inputs[index];
+                    if (input) {
+                        // Set the value
+                        input.value = vehicleConfig[fieldName];
+                        selectedValues[fieldName] = vehicleConfig[fieldName];
+                        
+                        // Mark field as completed
+                        const group = input.closest(".vehicle-selector-input-group");
+                        if (group) {
+                            group.classList.add("completed");
+                            group.classList.remove("active", "disabled");
+                        }
+                        
+                        lastSetFieldIndex = index;
+                        
+                        // Determine which question set we should be on
+                        if (index >= 4 && index <= 6) targetQuestionSet = 1;
+                        else if (index >= 7) targetQuestionSet = 2;
+                    }
+                }
+            });
+            
+            // Switch to appropriate question set
+            if (lastSetFieldIndex >= 0) {
+                const isComplete = fieldNames.every(fieldName => vehicleConfig[fieldName]);
+                
+                if (isComplete) {
+                    // All fields complete - go to summary
+                    switchToQuestionSet(2);
+                    generateSummary(!triggerCallbacks); // Skip onComplete if requested
+                } else {
+                    // Go to the question set of the next field to be filled
+                    const nextFieldIndex = lastSetFieldIndex + 1;
+                    if (nextFieldIndex < 4) {
+                        switchToQuestionSet(0);
+                    } else if (nextFieldIndex < 7) {
+                        switchToQuestionSet(1);
+                    } else {
+                        switchToQuestionSet(2);
+                    }
+                    
+                    // Enable and focus the next field
+                    if (nextFieldIndex < elements.inputs.length && focusOnComplete) {
+                        enableField(nextFieldIndex);
+                    }
+                }
+            }
+            
+            // Update navigation arrows
+            updateNavigationArrows();
+            
+            console.log('Vehicle configuration set successfully:', vehicleConfig);
+            return true;
+            
+        } catch (error) {
+            console.error('Error setting vehicle configuration:', error);
+            return false;
+        }
+    }
+
+    // Validate vehicle configuration object
+    function isValidVehicleConfiguration(config) {
+        if (!config || typeof config !== 'object') return false;
+        
+        // Check if at least one field is provided
+        const hasValidFields = fieldNames.some(fieldName => 
+            config[fieldName] && typeof config[fieldName] === 'string'
+        );
+        
+        if (!hasValidFields) return false;
+        
+        // Validate sequential dependency (can't have model without make, etc.)
+        const providedFields = fieldNames.filter(fieldName => config[fieldName]);
+        for (let i = 0; i < providedFields.length - 1; i++) {
+            const currentFieldIndex = fieldNames.indexOf(providedFields[i]);
+            const nextFieldIndex = fieldNames.indexOf(providedFields[i + 1]);
+            
+            if (nextFieldIndex !== currentFieldIndex + 1) {
+                console.warn('Vehicle configuration has gaps in field sequence');
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
     // Initialize the selector
-    // Cleanup functions for better memory management
     const cleanup = {
         removeListeners: () => {
             elements.form.removeEventListener("focusin", handleFormFocusIn);
@@ -966,12 +1073,13 @@ function initVehicleSelector(config = {}) {
             cleanup.clearTimers();
             selectedValues = {};
         },
-        reset: (skipCallback = false) => handleResetSelection({ preventDefault: () => {} }, skipCallback), // Public reset method
-        setupInitialState: setupInitialState, // Keep original for backward compatibility
+        reset: (skipCallback = false) => handleResetSelection({ preventDefault: () => {} }, skipCallback),
+        setupInitialState: setupInitialState,
         getState: () => ({ ...selectedValues }),
         getConfig: () => ({ formId, dropdownId, summaryId, fieldNames }),
         updateData: (newData) => {
             Object.assign(vehicleData, newData);
-        }
+        },
+        setConfiguration: setVehicleConfiguration
     };
 }
