@@ -877,11 +877,16 @@ function initVehicleSelector(config = {}) {
             }
         });
 
-        // Focus on the first field
+        // Focus on the first field with proper timing for dropdown
         if (elements.inputs[0]) {
             elements.inputs[0].focus();
-            showDropdownForField(0);
-            updatePuck(0);
+            
+            // Force DOM update and then show dropdown
+            requestAnimationFrame(() => {
+                currentFieldIndex = 0;
+                showDropdownForField(0);
+                updatePuck(0);
+            });
         }
 
         // Update navigation arrows
