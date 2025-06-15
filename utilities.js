@@ -337,13 +337,13 @@ function initVehicleSelector(config = {}) {
         elements.dropdown.style.display = "block";
         elements.dropdown.style.opacity = "0";
         elements.dropdown.style.transform = "translateY(-10px)";
-        
+
         // Force a reflow to ensure dimensions are calculated
         elements.dropdown.offsetHeight; // Reading offsetHeight forces layout
-        
+
         // Now position with correct dimensions
         positionDropdown(elements.inputs[index]);
-        
+
         // Then animate in
         requestAnimationFrame(() => {
             elements.dropdown.style.transition = "opacity 0.2s ease, transform 0.2s ease";
@@ -1473,4 +1473,477 @@ function initVehicleSelector(config = {}) {
             }
         }
     };
+}
+
+function initVehicleGarage(config = {}) {
+    // Hoist all variables at the top
+    const STORAGE_KEY = 'vehicleGarage';
+    const MAX_VEHICLES = 3;
+    let garageData = [];
+
+    // Configuration with defaults
+    const settings = {
+        dropdownId: config.dropdownId || 'vehicle-garage-list',
+        jewelId: config.jewelId || 'garage-items',
+        onVehicleSelected: config.onVehicleSelected || null,
+        onVehicleRemoved: config.onVehicleRemoved || null,
+        onAddNewVehicle: config.onAddNewVehicle || null,
+        maxVehiclesMessage: config.maxVehiclesMessage || `You can only save up to ${MAX_VEHICLES} vehicles in your garage. Please create an account to save more vehicles.`,
+        ...config
+    };
+
+    // DOM elements - all scoped to the dropdown ID
+    const dropdown = document.getElementById(settings.dropdownId);
+    const vehicleGarageUl = dropdown?.querySelector('.vehicle-garage');
+    const jewelIndicator = document.getElementById(settings.jewelId);
+    const addNewVehicleBtn = dropdown?.querySelector('.dropdown-link');
+    const emptyState = dropdown?.querySelector('.vehicle-garage-empty-state');
+
+    // Check required elements
+    if (!dropdown) {
+        console.error(`Vehicle garage: Dropdown element with ID "${settings.dropdownId}" not found`);
+        return null;
+    }
+
+    if (!jewelIndicator) {
+        console.error(`Vehicle garage: Jewel indicator with ID "${settings.jewelId}" not found`);
+        return null;
+    }
+
+    // Initialize the garage system
+    function init() {
+        try {
+            // Load garage data from localStorage
+            loadGarageData();
+
+            // Set up event listeners
+            setupEventListeners();
+
+            // Initial render
+            renderGarage();
+
+            console.log('Vehicle garage initialized successfully');
+        } catch (error) {
+            console.error('Error initializing vehicle garage:', error);
+        }
+    }
+
+    // Load garage data from localStorage
+    function loadGarageData() {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            garageData = stored ? JSON.parse(stored) : [];
+
+            // Validate data structure
+            if (!Array.isArray(garageData)) {
+                garageData = [];
+            }
+
+            // Ensure each vehicle has required properties
+            garageData = garageData.filter(vehicle =>
+                vehicle &&
+                typeof vehicle === 'object' &&
+                vehicle.year &&
+                vehicle.make &&
+                vehicle.model
+            );
+
+        } catch (error) {
+            console.error('Error loading garage data:', error);
+            garageData = [];
+        }
+    }
+
+    // Save garage data to localStorage
+    function saveGarageData() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(garageData));
+        } catch (error) {
+            console.error('Error saving garage data:', error);
+        }
+    }
+
+    // Set up event listeners
+    function setupEventListeners() {
+        if (!vehicleGarageUl) return;
+
+        // Use event delegation for vehicle selection and removal
+        vehicleGarageUl.addEventListener('click', handleGarageClick);
+        vehicleGarageUl.addEventListener('keydown', handleGarageKeydown);
+
+        // Add new vehicle button
+        if (addNewVehicleBtn) {
+            addNewVehicleBtn.addEventListener('click', handleAddNewVehicle);
+            addNewVehicleBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleAddNewVehicle(e);
+                }
+            });
+        }
+    }
+
+    // Handle clicks within the garage list
+    function handleGarageClick(e) {
+        e.preventDefault();
+
+        const target = e.target.closest('a');
+        if (!target) return;
+
+        // Handle vehicle selection
+        if (target.classList.contains('vehicle-garage-entry-details')) {
+            const vehicleEntry = target.closest('.vehicle-garage-entry');
+            const vehicleId = vehicleEntry?.dataset.vehicleId;
+
+            if (vehicleId) {
+                selectVehicle(vehicleId);
+            }
+        }
+
+        // Handle vehicle removal
+        else if (target.classList.contains('remove-button')) {
+            const vehicleEntry = target.closest('.vehicle-garage-entry');
+            const vehicleId = vehicleEntry?.dataset.vehicleId;
+
+            if (vehicleId) {
+                removeVehicle(vehicleId);
+            }
+        }
+    }
+
+    // Handle keyboard navigation
+    function handleGarageKeydown(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleGarageClick(e);
+        }
+    }
+
+    // Handle adding new vehicle
+    function handleAddNewVehicle(e) {
+        e.preventDefault();
+
+        try {
+            // Deselect any currently selected vehicle
+            deselectAllVehicles();
+            renderGarage();
+
+            // Trigger callback if provided
+            if (typeof settings.onAddNewVehicle === 'function') {
+                settings.onAddNewVehicle();
+            }
+
+            console.log('Add new vehicle triggered');
+        } catch (error) {
+            console.error('Error handling add new vehicle:', error);
+        }
+    }
+
+    // Add vehicle to garage
+    function addVehicleToGarage(vehicleConfig) {
+        try {
+            // Check if garage is full
+            if (garageData.length >= MAX_VEHICLES) {
+                showMaxVehiclesMessage();
+                return false;
+            }
+
+            // Validate required fields
+            if (!vehicleConfig || !vehicleConfig.year || !vehicleConfig.make || !vehicleConfig.model) {
+                console.warn('Invalid vehicle configuration provided');
+                return false;
+            }
+
+            // Create vehicle object with unique ID
+            const vehicleId = generateVehicleId(vehicleConfig);
+            const vehicle = {
+                id: vehicleId,
+                ...vehicleConfig,
+                dateAdded: Date.now(),
+                selected: true // New vehicle is automatically selected
+            };
+
+            // Remove any existing selection
+            garageData.forEach(v => v.selected = false);
+
+            // Check if vehicle already exists
+            const existingIndex = garageData.findIndex(v => v.id === vehicleId);
+
+            if (existingIndex >= 0) {
+                // Update existing vehicle and move to end
+                garageData.splice(existingIndex, 1);
+                garageData.push(vehicle);
+            } else {
+                // Add new vehicle to end
+                garageData.push(vehicle);
+            }
+
+            // Save and render
+            saveGarageData();
+            renderGarage();
+
+            console.log('Vehicle added to garage:', vehicle);
+            return true;
+        } catch (error) {
+            console.error('Error adding vehicle to garage:', error);
+            return false;
+        }
+    }
+
+    // Generate unique vehicle ID
+    function generateVehicleId(vehicleConfig) {
+        const parts = [
+            vehicleConfig.year,
+            vehicleConfig.make,
+            vehicleConfig.model,
+            vehicleConfig.submodel || '',
+            vehicleConfig.chassis || '',
+            vehicleConfig.engine || '',
+            vehicleConfig.transmission || ''
+        ];
+
+        return parts
+            .filter(part => part && part !== 'I don\'t know')
+            .join('-')
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, '')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+    }
+
+    // Select a vehicle
+    function selectVehicle(vehicleId) {
+        try {
+            // Find the vehicle
+            const vehicle = garageData.find(v => v.id === vehicleId);
+            if (!vehicle) return false;
+
+            // Update selection in data
+            garageData.forEach(v => {
+                v.selected = v.id === vehicleId;
+            });
+
+            // Save changes
+            saveGarageData();
+
+            // Update UI
+            renderGarage();
+
+            // Trigger callback if provided
+            if (typeof settings.onVehicleSelected === 'function') {
+                settings.onVehicleSelected(vehicle);
+            }
+
+            console.log('Vehicle selected:', vehicleId);
+            return true;
+        } catch (error) {
+            console.error('Error selecting vehicle:', error);
+            return false;
+        }
+    }
+
+    // Remove a vehicle from garage
+    function removeVehicle(vehicleId) {
+        try {
+            const vehicleIndex = garageData.findIndex(v => v.id === vehicleId);
+
+            if (vehicleIndex === -1) return false;
+
+            const wasSelected = garageData[vehicleIndex].selected;
+            const removedVehicle = garageData[vehicleIndex];
+
+            // Remove vehicle
+            garageData.splice(vehicleIndex, 1);
+
+            // If removed vehicle was selected, select the last one
+            if (wasSelected && garageData.length > 0) {
+                garageData[garageData.length - 1].selected = true;
+            }
+
+            // Save and render
+            saveGarageData();
+            renderGarage();
+
+            // Trigger callback if provided
+            if (typeof settings.onVehicleRemoved === 'function') {
+                settings.onVehicleRemoved(removedVehicle, wasSelected);
+            }
+
+            console.log('Vehicle removed:', vehicleId);
+            return true;
+        } catch (error) {
+            console.error('Error removing vehicle:', error);
+            return false;
+        }
+    }
+
+    // Deselect all vehicles
+    function deselectAllVehicles() {
+        const hadSelection = garageData.some(v => v.selected);
+        garageData.forEach(vehicle => vehicle.selected = false);
+        saveGarageData();
+        return hadSelection;
+    }
+
+    // Render the garage UI
+    function renderGarage() {
+        try {
+            if (!vehicleGarageUl) return;
+
+            // Clear existing vehicle entries (keep empty state)
+            const existingEntries = vehicleGarageUl.querySelectorAll('.vehicle-garage-entry');
+            existingEntries.forEach(entry => entry.remove());
+
+            // Update garage jewel indicator
+            updateJewelIndicator();
+
+            if (garageData.length === 0) {
+                // Show empty state
+                if (emptyState) {
+                    emptyState.style.display = 'block';
+                }
+            } else {
+                // Hide empty state
+                if (emptyState) {
+                    emptyState.style.display = 'none';
+                }
+
+                // Render vehicles (in reverse order - newest first)
+                const sortedVehicles = [...garageData].reverse();
+
+                sortedVehicles.forEach(vehicle => {
+                    const vehicleElement = createVehicleElement(vehicle);
+
+                    // Insert before empty state if it exists
+                    if (emptyState) {
+                        vehicleGarageUl.insertBefore(vehicleElement, emptyState);
+                    } else {
+                        vehicleGarageUl.appendChild(vehicleElement);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error rendering garage:', error);
+        }
+    }
+
+    // Create vehicle element
+    function createVehicleElement(vehicle) {
+        const li = document.createElement('li');
+        li.className = `vehicle-garage-entry${vehicle.selected ? ' selected' : ''}`;
+        li.dataset.vehicleId = vehicle.id;
+
+        // Generate vehicle title and subtitle
+        const title = generateVehicleTitle(vehicle);
+        const subtitle = generateVehicleSubtitle(vehicle);
+
+        li.innerHTML = `
+        <a href="#" class="vehicle-garage-entry-details" tabindex="0">
+          <div class="fake-radio-button"></div>
+          <div class="flex-block-34">
+            <div class="vehicle-entry-title">${escapeHtml(title)}</div>
+            <div class="vehicle-entry-subtitle">${escapeHtml(subtitle)}</div>
+          </div>
+        </a>
+        <div class="vehicle-garage-entry-actions">
+          <a href="#" class="remove-button" tabindex="0">
+            <div>Remove</div>
+          </a>
+        </div>
+      `;
+
+        return li;
+    }
+
+    // Generate vehicle title
+    function generateVehicleTitle(vehicle) {
+        const parts = [vehicle.year, vehicle.make, vehicle.model];
+        return parts.filter(Boolean).join(' ');
+    }
+
+    // Generate vehicle subtitle
+    function generateVehicleSubtitle(vehicle) {
+        const parts = [
+            vehicle.submodel,
+            vehicle.chassis,
+            vehicle.engine,
+            vehicle.transmission
+        ].filter(part => part && part !== 'I don\'t know');
+
+        return parts.join(', ') || 'Standard Configuration';
+    }
+
+    // Update jewel indicator
+    function updateJewelIndicator() {
+        if (!jewelIndicator) return;
+
+        const count = garageData.length;
+
+        if (count > 1) {
+            jewelIndicator.textContent = count.toString();
+            jewelIndicator.style.display = 'block';
+        } else {
+            jewelIndicator.style.display = 'none';
+        }
+    }
+
+    // Show max vehicles message
+    function showMaxVehiclesMessage() {
+        alert(settings.maxVehiclesMessage);
+    }
+
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Public API
+    const api = {
+        // Add vehicle to garage
+        addVehicle: addVehicleToGarage,
+
+        // Remove vehicle from garage
+        removeVehicle: removeVehicle,
+
+        // Select vehicle
+        selectVehicle: selectVehicle,
+
+        // Deselect all vehicles
+        deselectAll: () => {
+            const hadSelection = deselectAllVehicles();
+            renderGarage();
+            return hadSelection;
+        },
+
+        // Get garage data
+        getGarageData: () => [...garageData],
+
+        // Get selected vehicle
+        getSelectedVehicle: () => garageData.find(v => v.selected) || null,
+
+        // Clear garage
+        clearGarage: () => {
+            garageData = [];
+            saveGarageData();
+            renderGarage();
+        },
+
+        // Refresh garage (reload from storage and re-render)
+        refresh: () => {
+            loadGarageData();
+            renderGarage();
+        },
+
+        // Update configuration
+        updateConfig: (newConfig) => {
+            Object.assign(settings, newConfig);
+        }
+    };
+
+    // Initialize the garage
+    init();
+
+    return api;
 }
