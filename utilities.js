@@ -1522,6 +1522,19 @@ function initVehicleGarage(config = {}) {
             // Initial render
             renderGarage();
 
+            // NEW: Auto-sync selected vehicle if configured
+            if (typeof settings.syncVehicleSelectorOnInit === 'function') {
+                const selectedVehicle = garageData.find(v => v.selected);
+                if (selectedVehicle) {
+                    try {
+                        settings.syncVehicleSelectorOnInit(selectedVehicle);
+                        console.log('Vehicle selector synced with garage selection:', selectedVehicle);
+                    } catch (error) {
+                        console.error('Error syncing vehicle selector on init:', error);
+                    }
+                }
+            }
+            
             console.log('Vehicle garage initialized successfully');
         } catch (error) {
             console.error('Error initializing vehicle garage:', error);
@@ -1873,18 +1886,50 @@ function initVehicleGarage(config = {}) {
         return parts.join(', ') || 'Standard Configuration';
     }
 
-    // Update jewel indicator
+    // Update jewel indicator with pop animation
     function updateJewelIndicator() {
         if (!jewelIndicator) return;
-
+        
         const count = garageData.length;
-
-        if (count > 1) {
-            jewelIndicator.textContent = count.toString();
-            jewelIndicator.style.display = 'block';
-        } else {
-            jewelIndicator.style.display = 'none';
+        const wasVisible = jewelIndicator.style.display !== 'none';
+        
+        if (count >= 1) { // FIX: Show jewel when 1 or more vehicles (was > 1)
+        jewelIndicator.textContent = count.toString();
+        jewelIndicator.style.display = 'block';
+        
+        // Add pop animation effect when jewel becomes visible or count changes
+        if (!wasVisible || parseInt(jewelIndicator.textContent) !== count) {
+            animateJewelPop();
         }
+        } else {
+        jewelIndicator.style.display = 'none';
+        }
+    }
+
+    // Animate jewel pop effect using JavaScript transitions
+    function animateJewelPop() {
+        if (!jewelIndicator) return;
+        
+        // Store original transform
+        const originalTransform = jewelIndicator.style.transform || '';
+        
+        // Apply pop effect: scale up then back to normal
+        jewelIndicator.style.transition = 'transform 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+        jewelIndicator.style.transform = 'scale(1.3)';
+        
+        // Reset to normal size after animation
+        setTimeout(() => {
+        if (jewelIndicator) {
+            jewelIndicator.style.transform = originalTransform;
+            
+            // Clean up transition after animation completes
+            setTimeout(() => {
+            if (jewelIndicator) {
+                jewelIndicator.style.transition = '';
+            }
+            }, 200);
+        }
+        }, 150);
     }
 
     // Show max vehicles message
@@ -1939,6 +1984,21 @@ function initVehicleGarage(config = {}) {
         // Update configuration
         updateConfig: (newConfig) => {
             Object.assign(settings, newConfig);
+        },
+
+        // Manual sync method for external use
+        syncVehicleSelector: (vehicleSelectorInstance) => {
+            const selectedVehicle = garageData.find(v => v.selected);
+            if (selectedVehicle && vehicleSelectorInstance && typeof vehicleSelectorInstance.setConfiguration === 'function') {
+                try {
+                    vehicleSelectorInstance.setConfiguration(selectedVehicle, { triggerCallbacks: false });
+                    return true;
+                } catch (error) {
+                    console.error('Error syncing with vehicle selector:', error);
+                    return false;
+                }
+            }
+            return false;
         }
     };
 
