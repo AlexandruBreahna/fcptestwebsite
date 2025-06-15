@@ -2042,54 +2042,40 @@ function initCarousel(options = {}) {
  
     // Initialize carousel
     function init() {
-       try {
-          // Get DOM elements
-          elements.carousel = document.getElementById(config.carouselId);
-          if (!elements.carousel) {
-             console.warn(`Carousel with ID "${config.carouselId}" not found`);
-             return false;
-          }
- 
-          elements.wrapper = elements.carousel.querySelector(
-             ".carousel-widget-wrapper"
-          );
-          elements.scroller = elements.carousel.querySelector(
-             ".carousel-widget-scroller"
-          );
-          elements.leftArrow = elements.carousel.querySelector(
-             ".carousel-widget-arrow-left"
-          );
-          elements.rightArrow = elements.carousel.querySelector(
-             ".carousel-widget-arrow-right"
-          );
-          elements.pagination = elements.carousel.querySelector(
-             ".carousel-widget-pagination"
-          );
-          elements.productCards = elements.carousel.querySelectorAll(
-             ".product-card"
-          );
- 
-          if (
-             !elements.wrapper ||
-             !elements.scroller ||
-             !elements.productCards.length
-          ) {
-             console.warn("Required carousel elements not found");
-             return false;
-          }
- 
-          state.totalCards = elements.productCards.length;
- 
-          // Initial setup
-          calculateDimensions();
-          setupEventListeners();
-          updateUI();
- 
-          return true;
-       } catch (error) {
-          console.error("Error initializing carousel:", error);
-          return false;
-       }
+        try {
+        // Get DOM elements
+        elements.carousel = document.getElementById(config.carouselId);
+        if (!elements.carousel) {
+            console.warn(`Carousel with ID "${config.carouselId}" not found`);
+            return false;
+        }
+    
+        elements.wrapper = elements.carousel.querySelector('.carousel-widget-wrapper');
+        elements.scroller = elements.carousel.querySelector('.carousel-widget-scroller');
+        elements.leftArrow = elements.carousel.querySelector('.carousel-widget-arrow-left');
+        elements.rightArrow = elements.carousel.querySelector('.carousel-widget-arrow-right');
+        elements.pagination = elements.carousel.querySelector('.carousel-widget-pagination');
+        
+        // Get all direct children of scroller instead of specific class
+        elements.productCards = elements.scroller.children;
+    
+        if (!elements.wrapper || !elements.scroller || !elements.productCards.length) {
+            console.warn('Required carousel elements not found');
+            return false;
+        }
+    
+        state.totalCards = elements.productCards.length;
+        
+        // Initial setup
+        calculateDimensions();
+        setupEventListeners();
+        updateUI();
+        
+        return true;
+        } catch (error) {
+        console.error('Error initializing carousel:', error);
+        return false;
+        }
     }
  
     // Calculate carousel dimensions and positions
