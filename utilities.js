@@ -2010,3 +2010,645 @@ function initVehicleGarage(config = {}) {
 
     return api;
 }
+
+function initCarousel(options = {}) {
+    // Configuration with defaults
+    const config = {
+       carouselId: "recommended-products",
+       showPagination: true,
+       mobileBreakpoint: 990,
+       animationDuration: 300,
+       ...options
+    };
+ 
+    // State object to hold all dynamic values
+    const state = {
+       currentPosition: 0,
+       maxPosition: 0,
+       cardWidth: 0,
+       visibleCards: 0,
+       totalCards: 0,
+       totalPages: 0,
+       currentPage: 0,
+       isDesktop: true,
+       isDragging: false,
+       startX: 0,
+       startScrollLeft: 0,
+       resizeTimeout: null
+    };
+ 
+    // DOM elements (initialized in init)
+    const elements = {};
+ 
+    // Initialize carousel
+    function init() {
+       try {
+          // Get DOM elements
+          elements.carousel = document.getElementById(config.carouselId);
+          if (!elements.carousel) {
+             console.warn(`Carousel with ID "${config.carouselId}" not found`);
+             return false;
+          }
+ 
+          elements.wrapper = elements.carousel.querySelector(
+             ".carousel-widget-wrapper"
+          );
+          elements.scroller = elements.carousel.querySelector(
+             ".carousel-widget-scroller"
+          );
+          elements.leftArrow = elements.carousel.querySelector(
+             ".carousel-widget-arrow-left"
+          );
+          elements.rightArrow = elements.carousel.querySelector(
+             ".carousel-widget-arrow-right"
+          );
+          elements.pagination = elements.carousel.querySelector(
+             ".carousel-widget-pagination"
+          );
+          elements.productCards = elements.carousel.querySelectorAll(
+             ".product-card"
+          );
+ 
+          if (
+             !elements.wrapper ||
+             !elements.scroller ||
+             !elements.productCards.length
+          ) {
+             console.warn("Required carousel elements not found");
+             return false;
+          }
+ 
+          state.totalCards = elements.productCards.length;
+ 
+          // Initial setup
+          calculateDimensions();
+          setupEventListeners();
+          updateUI();
+ 
+          return true;
+       } catch (error) {
+          console.error("Error initializing carousel:", error);
+          return false;
+       }
+    }
+ 
+    // Calculate carousel dimensions and positions
+    function calculateDimensions() {
+       // Account for wrapper padding (8px) that affects the effective scroll area
+       const wrapperPadding = 8;
+       const wrapperWidth = elements.wrapper.offsetWidth - wrapperPadding * 2;
+       const scrollerWidth = elements.scroller.scrollWidth;
+ 
+       // Get computed card width including gap
+       if (elements.productCards.length > 0) {
+          const cardRect = elements.productCards[0].getBoundingClientRect();
+          const cardStyle = getComputedStyle(elements.productCards[0]);
+          const marginRight = parseFloat(cardStyle.marginRight) || 0;
+          state.cardWidth = cardRect.width + marginRight;
+       }
+ 
+       // Calculate visible cards based on effective wrapper width
+       state.visibleCards = Math.floor(wrapperWidth / state.cardWidth);
+       if (state.visibleCards === 0) state.visibleCards = 1;
+ 
+       // Calculate maximum scroll position accounting for wrapper padding
+       state.maxPosition = Math.max(0, scrollerWidth - wrapperWidth);
+ 
+       // Calculate total pages - ensure at least 1 page
+       state.totalPages = Math.ceil(state.totalCards / state.visibleCards);
+       if (state.totalPages === 0) state.totalPages = 1;
+ 
+       // Check if desktop view
+       state.isDesktop = window.innerWidth >= config.mobileBreakpoint;
+    }
+ 
+    // Setup event listeners - ensure mobile touch events work properly
+    function setupEventListeners() {
+       // Arrow navigation (desktop only)
+       if (elements.leftArrow) {
+          elements.leftArrow.addEventListener("click", handleLeftClick);
+       }
+       if (elements.rightArrow) {
+          elements.rightArrow.addEventListener("click", handleRightClick);
+       }
+ 
+       // Touch/drag events - ensure mobile compatibility
+       if (elements.scroller) {
+          // Mouse events for desktop dragging
+          elements.scroller.addEventListener("mousedown", handleDragStart);
+          document.addEventListener("mousemove", handleDragMove); // Listen on document for better mobile support
+          document.addEventListener("mouseup", handleDragEnd);
+ 
+          // Touch events for mobile - with proper event handling
+          elements.scroller.addEventListener("touchstart", handleDragStart, {
+             passive: false
+          });
+          document.addEventListener("touchmove", handleDragMove, {
+             passive: false
+          }); // Listen on document
+          document.addEventListener("touchend", handleDragEnd, {
+             passive: false
+          });
+ 
+          // Prevent context menu during drag
+          elements.scroller.addEventListener("contextmenu", (e) => {
+             if (state.isDragging) e.preventDefault();
+          });
+       }
+ 
+       // Pagination clicks
+       if (elements.pagination && config.showPagination) {
+          elements.pagination.addEventListener("click", handlePaginationClick);
+       }
+ 
+       // Window resize with debounce
+       window.addEventListener("resize", debounce(handleResize, 250));
+    }
+ 
+    // Handle left arrow click
+    function handleLeftClick(e) {
+       e.preventDefault();
+       if (!state.isDesktop || state.currentPosition <= 0) return;
+ 
+       // Use actual card width including gap for consistency with drag snapping
+       let actualCardWidth = state.cardWidth;
+       if (elements.productCards.length > 0) {
+          const cardRect = elements.productCards[0].getBoundingClientRect();
+          const scrollerStyle = getComputedStyle(elements.scroller);
+          const gap =
+             parseFloat(scrollerStyle.columnGap) ||
+             parseFloat(scrollerStyle.gap) ||
+             8;
+          actualCardWidth = cardRect.width + gap;
+       }
+ 
+       const moveDistance = Math.min(
+          actualCardWidth * state.visibleCards,
+          state.currentPosition
+       );
+       state.currentPosition -= moveDistance;
+       updateScrollPosition();
+    }
+ 
+    // Handle right arrow click
+    function handleRightClick(e) {
+       e.preventDefault();
+       if (!state.isDesktop || state.currentPosition >= state.maxPosition)
+          return;
+ 
+       // Use actual card width including gap for consistency with drag snapping
+       let actualCardWidth = state.cardWidth;
+       if (elements.productCards.length > 0) {
+          const cardRect = elements.productCards[0].getBoundingClientRect();
+          const scrollerStyle = getComputedStyle(elements.scroller);
+          const gap =
+             parseFloat(scrollerStyle.columnGap) ||
+             parseFloat(scrollerStyle.gap) ||
+             8;
+          actualCardWidth = cardRect.width + gap;
+       }
+ 
+       const moveDistance = Math.min(
+          actualCardWidth * state.visibleCards,
+          state.maxPosition - state.currentPosition
+       );
+       state.currentPosition += moveDistance;
+       updateScrollPosition();
+    }
+ 
+    // Handle drag start - works on both desktop and mobile with better mobile optimization
+    function handleDragStart(e) {
+       state.isDragging = true;
+       state.startX = e.type === "mousedown" ? e.clientX : e.touches[0].clientX;
+       state.startScrollLeft = state.currentPosition;
+ 
+       // Visual feedback for dragging
+       elements.scroller.style.cursor = "grabbing";
+       elements.scroller.style.userSelect = "none";
+ 
+       // Prevent default to avoid text selection on desktop
+       if (e.type === "mousedown") {
+          e.preventDefault();
+       }
+ 
+       // Remove any existing transitions for immediate response
+       elements.scroller.style.transition = "none";
+    }
+ 
+    // Handle drag move - optimized for fluid mobile scrolling
+    function handleDragMove(e) {
+       if (!state.isDragging) return;
+ 
+       e.preventDefault();
+       const currentX =
+          e.type === "mousemove" ? e.clientX : e.touches[0].clientX;
+       const deltaX = state.startX - currentX;
+       const newPosition = state.startScrollLeft + deltaX;
+ 
+       let constrainedPosition;
+       let transformValue;
+ 
+       // Reduced elasticity for more fluid feel on mobile
+       const elasticity = state.isDesktop ? 0.3 : 0.5; // Higher elasticity on mobile
+ 
+       if (newPosition < 0) {
+          // Past left boundary - elastic resistance
+          const overscroll = Math.abs(newPosition);
+          constrainedPosition = -overscroll * elasticity;
+          // Move content RIGHT (positive transform) to show elastic space on left
+          transformValue = Math.abs(constrainedPosition);
+          elements.scroller.style.transform = `translateX(${transformValue}px)`;
+       } else if (newPosition > state.maxPosition) {
+          // Past right boundary - elastic resistance
+          const overscroll = newPosition - state.maxPosition;
+          constrainedPosition = state.maxPosition + overscroll * elasticity;
+          // Move content LEFT (negative transform) to show elastic space on right
+          transformValue = constrainedPosition;
+          elements.scroller.style.transform = `translateX(-${transformValue}px)`;
+       } else {
+          // Within normal bounds - store actual position for pagination
+          constrainedPosition = newPosition;
+          transformValue = constrainedPosition;
+          elements.scroller.style.transform = `translateX(-${transformValue}px)`;
+       }
+ 
+       // Always update state position for proper pagination tracking
+       state.currentPosition = constrainedPosition;
+    }
+ 
+    // Handle drag end - optimized animation timing for mobile
+    function handleDragEnd() {
+       if (!state.isDragging) return;
+ 
+       state.isDragging = false;
+       elements.scroller.style.cursor = "";
+       elements.scroller.style.userSelect = "";
+ 
+       // Check if we're outside bounds
+       const isLeftOfBounds = state.currentPosition < 0;
+       const isRightOfBounds = state.currentPosition > state.maxPosition;
+       const wasOutOfBounds = isLeftOfBounds || isRightOfBounds;
+ 
+       // Get actual card width including gap
+       let actualCardWidth = state.cardWidth;
+       if (elements.productCards.length > 0) {
+          const cardRect = elements.productCards[0].getBoundingClientRect();
+          const scrollerStyle = getComputedStyle(elements.scroller);
+          const gap =
+             parseFloat(scrollerStyle.columnGap) ||
+             parseFloat(scrollerStyle.gap) ||
+             8;
+          actualCardWidth = cardRect.width + gap;
+       }
+ 
+       let snapPosition;
+ 
+       if (wasOutOfBounds) {
+          // Bounce back to nearest boundary
+          snapPosition = isLeftOfBounds ? 0 : state.maxPosition;
+       } else {
+          // Normal card snapping within bounds
+          const cardIndex = Math.round(state.currentPosition / actualCardWidth);
+          snapPosition = cardIndex * actualCardWidth;
+ 
+          // Reduced velocity threshold for more responsive mobile snapping
+          const dragVelocity = state.currentPosition - state.startScrollLeft;
+          const velocityThreshold = state.isDesktop
+             ? actualCardWidth * 0.3
+             : actualCardWidth * 0.2; // Lower threshold on mobile
+ 
+          if (Math.abs(dragVelocity) > velocityThreshold) {
+             if (dragVelocity > 0) {
+                snapPosition =
+                   Math.ceil(state.currentPosition / actualCardWidth) *
+                   actualCardWidth;
+             } else {
+                snapPosition =
+                   Math.floor(state.currentPosition / actualCardWidth) *
+                   actualCardWidth;
+             }
+          }
+ 
+          // Keep within bounds
+          snapPosition = Math.max(0, Math.min(state.maxPosition, snapPosition));
+       }
+ 
+       // Update position with appropriate animation
+       state.currentPosition = snapPosition;
+ 
+       // Faster, more responsive animations on mobile
+       const easing = wasOutOfBounds
+          ? "cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+          : "ease-out";
+       const baseDuration = state.isDesktop
+          ? config.animationDuration
+          : config.animationDuration * 0.8; // 20% faster on mobile
+       const duration = wasOutOfBounds ? baseDuration * 1.3 : baseDuration;
+ 
+       elements.scroller.style.transition = `transform ${duration}ms ${easing}`;
+       elements.scroller.style.transform = `translateX(-${state.currentPosition}px)`;
+ 
+       // Update pagination using constrained position
+       const constrainedPosition = Math.max(
+          0,
+          Math.min(state.maxPosition, state.currentPosition)
+       );
+ 
+       if (state.isDesktop) {
+          const pageWidth = actualCardWidth * state.visibleCards;
+          state.currentPage =
+             pageWidth > 0
+                ? Math.min(
+                     Math.floor(constrainedPosition / pageWidth),
+                     state.totalPages - 1
+                  )
+                : 0;
+       } else {
+          state.currentPage =
+             state.maxPosition === 0
+                ? 0
+                : Math.round(
+                     (constrainedPosition / state.maxPosition) *
+                        (state.totalPages - 1)
+                  );
+       }
+ 
+       updateUI();
+    }
+ 
+    // Handle pagination click
+    function handlePaginationClick(e) {
+       e.preventDefault();
+       const pageElement = e.target.closest(".carousel-widget-page");
+       if (!pageElement) return;
+ 
+       const pages = elements.pagination.querySelectorAll(
+          ".carousel-widget-page"
+       );
+       const clickedIndex = Array.from(pages).indexOf(pageElement);
+ 
+       if (clickedIndex !== -1 && clickedIndex !== state.currentPage) {
+          goToPage(clickedIndex);
+       }
+    }
+ 
+    // Go to specific page
+    function goToPage(pageIndex) {
+       if (pageIndex < 0 || pageIndex >= state.totalPages) return false;
+ 
+       state.currentPage = pageIndex;
+ 
+       if (state.isDesktop) {
+          // For desktop, move by card groups
+          const targetPosition = Math.min(
+             pageIndex * state.cardWidth * state.visibleCards,
+             state.maxPosition
+          );
+          state.currentPosition = targetPosition;
+       } else {
+          // For mobile, distribute scroll range across pages
+          const scrollPerPage = state.maxPosition / (state.totalPages - 1);
+          state.currentPosition =
+             pageIndex === state.totalPages - 1
+                ? state.maxPosition
+                : pageIndex * scrollPerPage;
+       }
+ 
+       updateScrollPosition();
+       return true;
+    }
+ 
+    // Update scroll position
+    function updateScrollPosition(smooth = true) {
+       if (!elements.scroller) return;
+ 
+       // Apply transform
+       elements.scroller.style.transition = smooth
+          ? `transform ${config.animationDuration}ms ease-out`
+          : "none";
+       elements.scroller.style.transform = `translateX(-${state.currentPosition}px)`;
+ 
+       // Update current page based on position
+       if (state.isDesktop) {
+          const pageWidth = state.cardWidth * state.visibleCards;
+          state.currentPage =
+             pageWidth > 0
+                ? Math.min(
+                     Math.floor(state.currentPosition / pageWidth),
+                     state.totalPages - 1
+                  )
+                : 0;
+       } else {
+          state.currentPage =
+             state.maxPosition === 0
+                ? 0
+                : Math.round(
+                     (state.currentPosition / state.maxPosition) *
+                        (state.totalPages - 1)
+                  );
+       }
+ 
+       updateUI();
+    }
+ 
+    // Update all UI elements
+    function updateUI() {
+       updateArrowStates();
+       updatePaginationStates();
+    }
+ 
+    // Update arrow visibility and states
+    function updateArrowStates() {
+       if (!elements.leftArrow || !elements.rightArrow) return;
+ 
+       if (state.isDesktop) {
+          elements.leftArrow.style.display = "block";
+          elements.rightArrow.style.display = "block";
+ 
+          // Add/remove disabled class for styling
+          elements.leftArrow.classList.toggle(
+             "disabled",
+             state.currentPosition <= 0
+          );
+          elements.rightArrow.classList.toggle(
+             "disabled",
+             state.currentPosition >= state.maxPosition
+          );
+       } else {
+          elements.leftArrow.style.display = "none";
+          elements.rightArrow.style.display = "none";
+       }
+    }
+ 
+    // Generate pagination dots
+    function generatePagination() {
+       if (!elements.pagination || !config.showPagination) {
+          if (elements.pagination) elements.pagination.style.display = "none";
+          return;
+       }
+ 
+       elements.pagination.style.display = "flex";
+       elements.pagination.innerHTML = "";
+ 
+       // Create pagination dots
+       for (let i = 0; i < state.totalPages; i++) {
+          const dot = document.createElement("a");
+          dot.href = "#";
+          dot.className = "carousel-widget-page";
+          if (i === state.currentPage) {
+             dot.classList.add("selected");
+          }
+          elements.pagination.appendChild(dot);
+       }
+    }
+ 
+    // Update pagination states
+    function updatePaginationStates() {
+       if (!elements.pagination || !config.showPagination) return;
+ 
+       const pages = elements.pagination.querySelectorAll(
+          ".carousel-widget-page"
+       );
+       pages.forEach((page, index) => {
+          page.classList.toggle("selected", index === state.currentPage);
+       });
+    }
+ 
+    // Handle window resize
+    function handleResize() {
+       calculateDimensions();
+ 
+       // Reset position if it exceeds new max
+       if (state.currentPosition > state.maxPosition) {
+          state.currentPosition = state.maxPosition;
+       }
+ 
+       updateScrollPosition();
+       generatePagination();
+    }
+ 
+    // Navigate to next slide
+    function next() {
+       if (state.currentPage < state.totalPages - 1) {
+          return goToPage(state.currentPage + 1);
+       }
+       return false;
+    }
+ 
+    // Navigate to previous slide
+    function prev() {
+       if (state.currentPage > 0) {
+          return goToPage(state.currentPage - 1);
+       }
+       return false;
+    }
+ 
+    // Refresh carousel (recalculate dimensions)
+    function refresh() {
+       calculateDimensions();
+       updateScrollPosition();
+       generatePagination();
+    }
+ 
+    // Debounce utility
+    function debounce(func, wait) {
+       return function executedFunction(...args) {
+          const later = () => {
+             clearTimeout(state.resizeTimeout);
+             func.apply(this, args);
+          };
+          clearTimeout(state.resizeTimeout);
+          state.resizeTimeout = setTimeout(later, wait);
+       };
+    }
+ 
+    // Cleanup function - updated to clean up document listeners
+    function destroy() {
+       try {
+          // Remove event listeners
+          if (elements.leftArrow)
+             elements.leftArrow.removeEventListener("click", handleLeftClick);
+          if (elements.rightArrow)
+             elements.rightArrow.removeEventListener("click", handleRightClick);
+          if (elements.scroller) {
+             elements.scroller.removeEventListener("mousedown", handleDragStart);
+             elements.scroller.removeEventListener(
+                "touchstart",
+                handleDragStart
+             );
+             elements.scroller.removeEventListener(
+                "contextmenu",
+                handleDragStart
+             );
+          }
+ 
+          // Remove document listeners
+          document.removeEventListener("mousemove", handleDragMove);
+          document.removeEventListener("mouseup", handleDragEnd);
+          document.removeEventListener("touchmove", handleDragMove);
+          document.removeEventListener("touchend", handleDragEnd);
+ 
+          if (elements.pagination)
+             elements.pagination.removeEventListener(
+                "click",
+                handlePaginationClick
+             );
+          window.removeEventListener("resize", handleResize);
+ 
+          // Clear timeout
+          if (state.resizeTimeout) {
+             clearTimeout(state.resizeTimeout);
+          }
+ 
+          // Reset styles
+          if (elements.scroller) {
+             elements.scroller.style.transform = "";
+             elements.scroller.style.transition = "";
+             elements.scroller.style.cursor = "";
+             elements.scroller.style.userSelect = "";
+          }
+       } catch (error) {
+          console.error("Error destroying carousel:", error);
+       }
+    }
+ 
+    // Initialize carousel
+    if (!init()) {
+       return null;
+    }
+ 
+    // Generate initial pagination
+    generatePagination();
+ 
+    // Public API
+    return {
+       // Navigation methods
+       next,
+       prev,
+       goToPage,
+ 
+       // State getters
+       getCurrentPage: () => state.currentPage,
+       getTotalPages: () => state.totalPages,
+       getConfig: () => ({ ...config }),
+       getState: () => ({ ...state }),
+ 
+       // Utility methods
+       refresh,
+       destroy,
+ 
+       // Check if carousel can move
+       canGoNext: () => state.currentPage < state.totalPages - 1,
+       canGoPrev: () => state.currentPage > 0,
+ 
+       // Get current position info
+       getPosition: () => ({
+          current: state.currentPosition,
+          max: state.maxPosition,
+          percentage:
+             state.maxPosition === 0
+                ? 0
+                : (state.currentPosition / state.maxPosition) * 100
+       })
+    };
+ }
