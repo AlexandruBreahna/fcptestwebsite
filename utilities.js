@@ -1119,59 +1119,55 @@ function initVehicleSelector(config = {}) {
 
     // Set vehicle configuration programmatically
     function setVehicleConfiguration(vehicleConfig, options = {}) {
-        const {
-            triggerCallbacks = false,
+        const { 
+            triggerCallbacks = false, 
             focusOnComplete = true,
-            validateData = true
+            validateData = true 
         } = options;
-
+        
         try {
             // Validate configuration if requested
             if (validateData && !isValidVehicleConfiguration(vehicleConfig)) {
                 console.error('Invalid vehicle configuration provided:', vehicleConfig);
                 return false;
             }
-
+            
             // Reset to initial state first
-            handleResetSelection({ preventDefault: () => { } }, true); // Skip callback during reset
-
+            handleResetSelection({ preventDefault: () => {} }, true);
+            
             // Set values in the correct order
-            let lastStepFieldIndex = -1;
-
+            let lastSetFieldIndex = -1;
+            
             fieldNames.forEach((fieldName, index) => {
                 if (vehicleConfig[fieldName]) {
                     const input = elements.inputs[index];
                     if (input) {
-                        // Set the value
                         input.value = vehicleConfig[fieldName];
                         selectedValues[fieldName] = vehicleConfig[fieldName];
-
-                        // Mark field as completed
+                        
                         const group = input.closest(".vehicle-selector-input-group");
                         if (group) {
                             group.classList.add("completed");
                             group.classList.remove("active", "disabled");
                         }
-
-                        lastStepFieldIndex = index;
+                        
+                        lastSetFieldIndex = index;
                     }
                 }
             });
-
-            // Update intermediary summary if we have first 4 fields
+            
+            // Update intermediary summary
             updateIntermediarySummary();
-
-            // Switch to appropriate question step
-            if (lastStepFieldIndex >= 0) {
+            
+            // Switch to appropriate step and handle completion
+            if (lastSetFieldIndex >= 0) {
                 const isComplete = fieldNames.every(fieldName => vehicleConfig[fieldName]);
-
+                
                 if (isComplete) {
-                    // All fields complete - go to summary
                     switchToStep(2);
-                    generateSummary(!triggerCallbacks); // Skip onComplete if requested
+                    generateSummary(!triggerCallbacks);
                 } else {
-                    // Go to the step of the next field to be filled
-                    const nextFieldIndex = lastStepFieldIndex + 1;
+                    const nextFieldIndex = lastSetFieldIndex + 1;
                     if (nextFieldIndex < 4) {
                         switchToStep(0);
                     } else if (nextFieldIndex < 7) {
@@ -1179,35 +1175,17 @@ function initVehicleSelector(config = {}) {
                     } else {
                         switchToStep(2);
                     }
-
-                    // Enable and focus the next field
+                    
                     if (nextFieldIndex < elements.inputs.length && focusOnComplete) {
                         enableField(nextFieldIndex);
                     }
                 }
             }
-
-            // Update navigation arrows
+            
             updateNavigationArrows();
-
-            // Handle button updates for programmatic configuration
-            if (lastSetFieldIndex >= 0) {
-                const isComplete = fieldNames.every(fieldName => vehicleConfig[fieldName]);
-
-                if (isComplete) {
-                    const redirectURL = generateRedirectURL(selectedValues);
-                    const matchType = getVehicleMatchType(selectedValues);
-
-                    if (redirectURL) {
-                        updateButtonVisibility(matchType);
-                        updateButtonProperties(redirectURL);
-                    }
-                }
-            }
-
             console.log('Vehicle configuration set successfully:', vehicleConfig);
             return true;
-
+            
         } catch (error) {
             console.error('Error setting vehicle configuration:', error);
             return false;
