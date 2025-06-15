@@ -1724,69 +1724,89 @@ function initVehicleGarage(config = {}) {
             .replace(/^-|-$/g, '');
     }
 
-    // Select a vehicle
+    // Select a vehicle (or deselect if already selected)
     function selectVehicle(vehicleId) {
         try {
-            // Find the vehicle
-            const vehicle = garageData.find(v => v.id === vehicleId);
-            if (!vehicle) return false;
-
-            // Update selection in data
-            garageData.forEach(v => {
-                v.selected = v.id === vehicleId;
-            });
-
+        // Find the vehicle
+        const vehicle = garageData.find(v => v.id === vehicleId);
+        if (!vehicle) return false;
+        
+        // Check if this vehicle is already selected
+        const isAlreadySelected = vehicle.selected;
+        
+        if (isAlreadySelected) {
+            // FIX: Deselect the vehicle if it's already selected
+            garageData.forEach(v => v.selected = false);
+            
             // Save changes
             saveGarageData();
-
+            
             // Update UI
             renderGarage();
-
+            
+            // Trigger removal callback to reset vehicle selector
+            if (typeof settings.onVehicleRemoved === 'function') {
+            settings.onVehicleRemoved(vehicle, true); // Reset vehicle selector
+            }
+            
+            console.log('Vehicle deselected:', vehicleId);
+            return true;
+        } else {
+            // Select the vehicle (deselect others)
+            garageData.forEach(v => {
+            v.selected = v.id === vehicleId;
+            });
+            
+            // Save changes
+            saveGarageData();
+            
+            // Update UI
+            renderGarage();
+            
             // Trigger callback if provided
             if (typeof settings.onVehicleSelected === 'function') {
-                settings.onVehicleSelected(vehicle);
+            settings.onVehicleSelected(vehicle);
             }
-
+            
             console.log('Vehicle selected:', vehicleId);
             return true;
+        }
         } catch (error) {
-            console.error('Error selecting vehicle:', error);
-            return false;
+        console.error('Error selecting vehicle:', error);
+        return false;
         }
     }
 
-    // Remove a vehicle from garage
+    // Remove a vehicle from garage and clear selection
     function removeVehicle(vehicleId) {
         try {
-            const vehicleIndex = garageData.findIndex(v => v.id === vehicleId);
-
-            if (vehicleIndex === -1) return false;
-
-            const wasSelected = garageData[vehicleIndex].selected;
-            const removedVehicle = garageData[vehicleIndex];
-
-            // Remove vehicle
-            garageData.splice(vehicleIndex, 1);
-
-            // If removed vehicle was selected, select the last one
-            if (wasSelected && garageData.length > 0) {
-                garageData[garageData.length - 1].selected = true;
-            }
-
-            // Save and render
-            saveGarageData();
-            renderGarage();
-
-            // Trigger callback if provided
-            if (typeof settings.onVehicleRemoved === 'function') {
-                settings.onVehicleRemoved(removedVehicle, wasSelected);
-            }
-
-            console.log('Vehicle removed:', vehicleId);
-            return true;
+        const vehicleIndex = garageData.findIndex(v => v.id === vehicleId);
+        
+        if (vehicleIndex === -1) return false;
+        
+        const wasSelected = garageData[vehicleIndex].selected;
+        const removedVehicle = garageData[vehicleIndex];
+        
+        // Remove vehicle
+        garageData.splice(vehicleIndex, 1);
+        
+        // FIX: Don't auto-select another vehicle - clear all selections
+        garageData.forEach(v => v.selected = false);
+        
+        // Save and render
+        saveGarageData();
+        renderGarage();
+        
+        // Trigger callback if provided (always pass true for wasSelected since we're clearing selection)
+        if (typeof settings.onVehicleRemoved === 'function') {
+            settings.onVehicleRemoved(removedVehicle, true); // Always reset vehicle selector
+        }
+        
+        console.log('Vehicle removed and selection cleared:', vehicleId);
+        return true;
         } catch (error) {
-            console.error('Error removing vehicle:', error);
-            return false;
+        console.error('Error removing vehicle:', error);
+        return false;
         }
     }
 
