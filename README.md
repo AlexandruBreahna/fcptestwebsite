@@ -89,21 +89,35 @@ A JavaScript component that creates an interactive, step-by-step vehicle configu
 
 ```javascript
 const carData = {
-  2020: {
-    BMW: {
-      "M3": {
-        "Competition": {
-          "4-door Sedan": {
-            "Petrol 3.0L Twin-Turbo": ["8-speed Auto", "Manual"]
+  2018: {
+    Audi: {
+      "A5": {
+        redirectUrls: {
+          default: "/carmakers/audi/a5",
+          parts: "/parts/audi/a5",
+          accessories: "/accessories/audi/a5"
+        },
+        "Premium Plus": {
+          "2dr Coupe": {
+            "2.0L TFSI Turbo 4-cyl 252hp": ["7-speed S tronic", "6-speed Manual"],
+            "3.0L TFSI V6 354hp": ["8-speed Tiptronic"]
+          },
+          "4dr Sportback": {
+            "2.0L TFSI Turbo 4-cyl 252hp": ["7-speed S tronic"],
+            "3.0L TFSI V6 354hp": ["8-speed Tiptronic"]
           }
         }
       }
     },
-    Audi: {
-      "A5 Sportback": {
-        "Premium Plus": {
-          "4-door Sportback": {
-            "Petrol 2.0L TFSI": ["7-speed S tronic"]
+    BMW: {
+      "3 Series": {
+        redirectUrls: {
+          default: "/carmakers/bmw/3-series",
+          parts: "/parts/bmw/3-series"
+        },
+        "330i": {
+          "4dr Sedan": {
+            "2.0L Twin Turbo 4-cyl 248hp": ["8-speed Automatic"]
           }
         }
       }
@@ -119,7 +133,8 @@ const vehicleSelector = initVehicleSelector({
   vehicleData: carData,
   customActions: {
     buttonText: "Browse Parts",
-    buttonVisibility: "always"
+    buttonVisibility: "always",
+    urlContext: "parts"
   },
   onComplete: (result) => {
     console.log('Vehicle selected:', result.summary);
@@ -134,9 +149,6 @@ const vehicleSelector = initVehicleSelector({
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `formId` | string | `"vehicle-selector-form"` | ID of the form element |
-| `dropdownId` | string | `"vehicle-selector-dropdown"` | ID of the dropdown element |
-| `summaryId` | string | `"vehicle-selector-complete-summary"` | ID of the complete summary element |
-| `intermediarySummaryId` | string | `"vehicle-selector-intermediary-summary"` | ID of the intermediary summary element |
 | `fieldNames` | array | `["year", "make", "model", ...]` | Names of the input fields |
 | `vehicleData` | object | `window.carData \|\| {}` | Vehicle data object |
 | `onComplete` | function | `null` | Callback when all fields are filled |
@@ -153,6 +165,7 @@ const vehicleSelector = initVehicleSelector({
 | `buttonVisibility` | string | `"always"` | Button visibility: `"always"`, `"never"`, `"compatibility"` |
 | `buttonUrlRef` | string | `""` | Query parameter for tracking (e.g., `"utm_source=selector"`) |
 | `buttonUrlCategory` | string | `""` | Page category to append to URL (e.g., `"braking-system"`) |
+| `urlContext` | string | `"default"` | Which URL context to use from vehicle data (`"default"`, `"parts"`, `"accessories"`) |
 
 ## Examples
 
@@ -163,10 +176,11 @@ const selector = initVehicleSelector({
   vehicleData: carData,
   customActions: {
     buttonText: "Browse Parts",
-    buttonVisibility: "always"
+    buttonVisibility: "always",
+    urlContext: "parts"
   },
   onComplete: (result) => {
-    // result.redirectURL = "/parts/bmw/m3/?year=2020&submodel=competition"
+    // result.redirectURL comes from vehicle data: "/parts/audi/a5/?year=2018&submodel=premium-plus"
     window.location.href = result.redirectURL;
   }
 });
@@ -177,8 +191,8 @@ const selector = initVehicleSelector({
 ```javascript
 // Define vehicles this page serves
 const pageVehicles = [
-  { year: "2020", make: "BMW", model: "M3", submodel: "Competition", chassis: "4-door Sedan", engine: "Petrol 3.0L Twin-Turbo", transmission: "8-speed Auto" },
-  { year: "2020", make: "BMW", model: "M3", submodel: "Competition", chassis: "4-door Sedan", engine: "Petrol 3.0L Twin-Turbo", transmission: "Manual" }
+  { year: "2018", make: "Audi", model: "A5", submodel: "Premium Plus", chassis: "4dr Sportback", engine: "2.0L TFSI Turbo 4-cyl 252hp", transmission: "7-speed S tronic" },
+  { year: "2018", make: "Audi", model: "A5", submodel: "Premium Plus", chassis: "2dr Coupe", engine: "2.0L TFSI Turbo 4-cyl 252hp", transmission: "7-speed S tronic" }
 ];
 
 const selector = initVehicleSelector({
@@ -187,7 +201,7 @@ const selector = initVehicleSelector({
     buttonText: "View Matching Parts",
     compatibleVehicles: pageVehicles,
     buttonVisibility: "compatibility", // Only show when vehicle doesn't match page
-    buttonUrlCategory: "braking-system",
+    urlContext: "parts",
     buttonUrlRef: "utm_source=product_page"
   },
   onComplete: (result) => {
@@ -196,7 +210,7 @@ const selector = initVehicleSelector({
       // Button will be hidden automatically
     } else {
       console.log(`${result.matchType} match - redirecting to: ${result.redirectURL}`);
-      // Button will be visible with redirect URL
+      // Button will be visible with redirect URL from vehicle data
     }
   }
 });
@@ -210,13 +224,13 @@ const selector = initVehicleSelector({
   customActions: {
     buttonText: "Find Parts",
     buttonVisibility: "compatibility",
-    buttonUrlCategory: "suspension",
+    urlContext: "parts",
     buttonUrlRef: "source=configurator&campaign=spring2024"
   },
   onComplete: (result) => {
-    // result.values: { year: "2020", make: "BMW", ... }
-    // result.summary: "2020 BMW M3 Competition 4-door Sedan..."
-    // result.redirectURL: "/parts/bmw/m3/suspension/?year=2020&submodel=competition&ref=source%3Dconfigurator%26campaign%3Dspring2024"
+    // result.values: { year: "2018", make: "Audi", ... }
+    // result.summary: "2018 Audi A5 Premium Plus 4dr Sportback..."
+    // result.redirectURL: "/parts/audi/a5/?year=2018&submodel=premium-plus&source=configurator&campaign=spring2024"
     // result.matchType: "none" | "partial" | "perfect"
     
     analytics.track('vehicle_configured', {
@@ -233,17 +247,19 @@ const selector = initVehicleSelector({
 
 ### URL Generation Examples
 
-The selector automatically generates clean, SEO-friendly URLs:
+The selector automatically gets URLs from vehicle data and appends parameters:
 
 ```javascript
-// Input: { year: "2020", make: "Audi", model: "A5 Sportback", submodel: "Premium Plus" }
-// Output: "/parts/audi/a5-sportback/?year=2020&submodel=premium-plus"
+// Vehicle data contains: redirectUrls: { parts: "/parts/audi/a5" }
+// User selection: { year: "2018", make: "Audi", model: "A5", submodel: "Premium Plus" }
+// Output: "/parts/audi/a5/?year=2018&submodel=premium-plus"
 
-// With category: 
-// Output: "/parts/audi/a5-sportback/braking-system/?year=2020&submodel=premium-plus"
+// With tracking parameters:
+// Output: "/parts/audi/a5/?year=2018&submodel=premium-plus&utm_source=selector"
 
-// With tracking:
-// Output: "/parts/audi/a5-sportback/?year=2020&submodel=premium-plus&ref=utm_source%3Dselector"
+// "I don't know" selections are excluded:
+// User selection: { year: "2018", make: "Audi", model: "A5", submodel: "I don't know" }
+// Output: "/parts/audi/a5/?year=2018"
 ```
 
 ## Methods
@@ -286,7 +302,7 @@ Get current selection values.
 
 ```javascript
 const currentSelection = selector.getState();
-console.log(currentSelection); // { year: "2020", make: "BMW", ... }
+console.log(currentSelection); // { year: "2018", make: "Audi", ... }
 ```
 
 ### `updateData(newData)`
@@ -327,24 +343,24 @@ The selector determines three types of matches:
 ### Perfect Match
 All 7 fields exactly match a vehicle in `compatibleVehicles`:
 ```javascript
-// User selected: 2020 BMW M3 Competition 4-door Sedan Petrol 3.0L 8-speed Auto
-// Page vehicle: 2020 BMW M3 Competition 4-door Sedan Petrol 3.0L 8-speed Auto
+// User selected: 2018 Audi A5 Premium Plus 4dr Sportback 2.0L TFSI 7-speed S tronic
+// Page vehicle: 2018 Audi A5 Premium Plus 4dr Sportback 2.0L TFSI 7-speed S tronic
 // Result: matchType = "perfect" (button hidden in compatibility mode)
 ```
 
 ### Partial Match
 Year, Make, Model match, but other fields differ or contain "I don't know":
 ```javascript
-// User selected: 2020 BMW M3 Competition 4-door Sedan "I don't know" "I don't know"
-// Page vehicle: 2020 BMW M3 Competition 4-door Sedan Petrol 3.0L 8-speed Auto
+// User selected: 2018 Audi A5 Premium Plus 4dr Sportback "I don't know" "I don't know"
+// Page vehicle: 2018 Audi A5 Premium Plus 4dr Sportback 2.0L TFSI 7-speed S tronic
 // Result: matchType = "partial" (button shown in compatibility mode)
 ```
 
 ### No Match
 Year, Make, or Model don't match any `compatibleVehicles`:
 ```javascript
-// User selected: 2020 Audi A4 ...
-// Page vehicles: Only BMW M3 variants
+// User selected: 2018 BMW 3 Series ...
+// Page vehicles: Only Audi A5 variants
 // Result: matchType = "none" (button shown in compatibility mode)
 ```
 
@@ -353,10 +369,10 @@ Year, Make, or Model don't match any `compatibleVehicles`:
 ```javascript
 // Preset configurations
 const presets = {
-  'bmw-m3': {
-    year: "2020", make: "BMW", model: "M3", 
-    submodel: "Competition", chassis: "4-door Sedan",
-    engine: "Petrol 3.0L Twin-Turbo", transmission: "8-speed Auto"
+  'audi-a5': {
+    year: "2018", make: "Audi", model: "A5", 
+    submodel: "Premium Plus", chassis: "4dr Sportback",
+    engine: "2.0L TFSI Turbo 4-cyl 252hp", transmission: "7-speed S tronic"
   }
 };
 
@@ -415,6 +431,8 @@ onError: (error) => {
 - **Keyboard**: Full keyboard navigation support (arrows, enter, escape)
 - **Mobile**: Touch-friendly with responsive design
 - **Accessibility**: Proper focus management and ARIA attributes
-- **URLs**: All URLs are automatically encoded and SEO-friendly
-- **"I don't know"**: Selecting "I don't know" for any field excludes it from URL parameters
+- **URLs**: URLs come from vehicle data and are automatically formatted with parameters
+- **"I don't know"**: Selecting "I don't know" for any field excludes it from URL parameters and summaries
 - **Button Logic**: Use `"compatibility"` visibility for product pages, `"always"` for homepage
+- **Field Names**: Must match the structure of your vehicle data (year, make, model, submodel, chassis, engine, transmission)
+- **Default Selection**: Dropdowns automatically select the first real option (skipping "I don't know")
