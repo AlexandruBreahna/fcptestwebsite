@@ -2019,6 +2019,7 @@ function initCarousel(options = {}) {
         mobileBreakpoint: 990,
         animationDuration: 300,
         startCentered: false,
+        focusOnItem: null,
         ...options
     };
 
@@ -2086,15 +2087,45 @@ function initCarousel(options = {}) {
             setupEventListeners();
             updateUI();
 
-            // Apply centered position after DOM layout is complete
-            if (config.startCentered) {
-                requestAnimationFrame(() => {
-                    // Recalculate dimensions to ensure accurate measurements
-                    calculateDimensions();
+            // Apply initial positioning after DOM layout is complete
+            requestAnimationFrame(() => {
+                // Recalculate dimensions to ensure accurate measurements
+                calculateDimensions();
+
+                // Determine initial position based on config
+                if (
+                    config.focusOnItem !== null &&
+                    config.focusOnItem >= 0 &&
+                    config.focusOnItem < state.totalCards
+                ) {
+                    // Focus on specific item
+                    state.currentPosition = calculateFocusPositionForItem(
+                        config.focusOnItem
+                    );
+
+                    // Update current page based on focused item
+                    if (config.startCentered) {
+                        state.currentPage = config.focusOnItem;
+                    } else {
+                        // For non-centered, calculate which page this item falls into
+                        const pageWidth = state.cardWidth * state.visibleCards;
+                        state.currentPage =
+                            pageWidth > 0
+                                ? Math.min(
+                                    Math.floor(state.currentPosition / pageWidth),
+                                    state.totalPages - 1
+                                )
+                                : 0;
+                    }
+                } else if (config.startCentered) {
+                    // Default centered positioning (first item)
                     state.currentPosition = calculateCenteredPosition();
-                    updateScrollPosition(false); // No animation for initial positioning
-                });
-            }
+                    state.currentPage = 0;
+                }
+                // For non-centered without focusOnItem, position stays at 0 (default)
+
+                updateScrollPosition(false); // No animation for initial positioning
+            });
 
             return true;
         } catch (error) {
@@ -2178,6 +2209,52 @@ function initCarousel(options = {}) {
         return calculateCenteredPositionForItem(0);
     }
 
+    // Calculate position to focus on a specific item
+    function calculateFocusPositionForItem(itemIndex) {
+        if (
+            !elements.productCards.length ||
+            itemIndex < 0 ||
+            itemIndex >= elements.productCards.length
+        ) {
+            return 0;
+        }
+
+        const wrapperPadding = 8;
+        const wrapperWidth = elements.wrapper.offsetWidth - wrapperPadding * 2;
+        const targetItem = elements.productCards[itemIndex];
+
+        if (!targetItem) return 0;
+
+        // Calculate item position relative to scroller start
+        let itemLeft = 0;
+        for (let i = 0; i < itemIndex; i++) {
+            const prevItem = elements.productCards[i];
+            const prevItemStyle = getComputedStyle(prevItem);
+            const gap =
+                parseFloat(prevItemStyle.marginRight) ||
+                parseFloat(getComputedStyle(elements.scroller).columnGap) ||
+                parseFloat(getComputedStyle(elements.scroller).gap) ||
+                0;
+            itemLeft += prevItem.offsetWidth + gap;
+        }
+
+        let targetScrollPosition;
+
+        if (config.startCentered) {
+            // For centered carousels: center the item in the wrapper
+            const wrapperCenter = wrapperWidth / 2;
+            const itemWidth = targetItem.offsetWidth;
+            const itemCenter = itemLeft + itemWidth / 2;
+            targetScrollPosition = itemCenter - wrapperCenter;
+        } else {
+            // For non-centered carousels: align item's left edge with wrapper's left edge
+            targetScrollPosition = itemLeft;
+        }
+
+        // Constrain within bounds
+        return Math.max(0, Math.min(state.maxPosition, targetScrollPosition));
+    }
+
     // Setup event listeners - ensure mobile touch events work properly
     function setupEventListeners() {
         // Arrow navigation (desktop only)
@@ -2216,7 +2293,7 @@ function initCarousel(options = {}) {
         if (elements.pagination && config.showPagination) {
             elements.pagination.addEventListener("click", handlePaginationClick);
         }
-        elements.scroller.style.touchAction = 'pan-x';
+        elements.scroller.style.touchAction = "pan-x";
 
         // Window resize with debounce
         window.addEventListener("resize", debounce(handleResize, 250));
@@ -2299,9 +2376,6 @@ function initCarousel(options = {}) {
         elements.scroller.style.cursor = "grabbing";
         elements.scroller.style.userSelect = "none";
 
-        // Disable pointer events on children to prevent clicks during drag
-        elements.scroller.style.pointerEvents = "none";
-
         // Prevent default to avoid text selection on desktop
         if (e.type === "mousedown") {
             e.preventDefault();
@@ -2309,42 +2383,54 @@ function initCarousel(options = {}) {
 
         // Remove any existing transitions for immediate response
         elements.scroller.style.transition = "none";
+
+        // Don't disable pointer events immediately - only after actual movement
     }
 
     // Handle drag move - optimized for fluid mobile scrolling
-    let animationFrame;
     function handleDragMove(e) {
         if (!state.isDragging) return;
 
         e.preventDefault();
-        const currentX =
-            e.type === "mousemove" ? e.clientX : e.touches[0].clientX;
+        const currentX = e.type === "mousemove" ? e.clientX : e.touches[0].clientX;
         const deltaX = state.startX - currentX;
         const newPosition = state.startScrollLeft + deltaX;
+
+        // Disable pointer events only after we detect actual movement (prevents accidental clicks)
+        const movementThreshold = 5; // pixels
+        if (Math.abs(deltaX) > movementThreshold) {
+            elements.scroller.style.pointerEvents = "none";
+        }
 
         let constrainedPosition;
         let transformValue;
 
-        const elasticity = state.isDesktop ? 0.3 : 0.7; // Higher elasticity on mobile
+        // Reduced elasticity for more fluid feel on mobile
+        const elasticity = state.isDesktop ? 0.3 : 0.5; // Higher elasticity on mobile
 
         if (newPosition < 0) {
+            // Past left boundary - elastic resistance
             const overscroll = Math.abs(newPosition);
             constrainedPosition = -overscroll * elasticity;
+            // Move content RIGHT (positive transform) to show elastic space on left
             transformValue = Math.abs(constrainedPosition);
             elements.scroller.style.transform = `translateX(${transformValue}px)`;
         } else if (newPosition > state.maxPosition) {
+            // Past right boundary - elastic resistance
             const overscroll = newPosition - state.maxPosition;
             constrainedPosition = state.maxPosition + overscroll * elasticity;
+            // Move content LEFT (negative transform) to show elastic space on right
             transformValue = constrainedPosition;
             elements.scroller.style.transform = `translateX(-${transformValue}px)`;
         } else {
+            // Within normal bounds - store actual position for pagination
             constrainedPosition = newPosition;
             transformValue = constrainedPosition;
             elements.scroller.style.transform = `translateX(-${transformValue}px)`;
         }
 
+        // Always update state position for proper pagination tracking
         state.currentPosition = constrainedPosition;
-
     }
 
     function handleDragEnd() {
@@ -2354,10 +2440,19 @@ function initCarousel(options = {}) {
         elements.scroller.style.cursor = "";
         elements.scroller.style.userSelect = "";
 
-        // Re-enable pointer events on children
-        setTimeout(() => {
+        // Re-enable pointer events immediately if no significant movement occurred
+        const deltaX = state.currentPosition - state.startScrollLeft;
+        const wasSignificantDrag = Math.abs(deltaX) > 5;
+
+        if (wasSignificantDrag) {
+            // Small delay to prevent accidental clicks after dragging
+            setTimeout(() => {
+                elements.scroller.style.pointerEvents = "";
+            }, 150);
+        } else {
+            // No significant drag - re-enable immediately to allow clicks
             elements.scroller.style.pointerEvents = "";
-        }, 100);
+        }
 
         // Check if we're outside bounds
         const isLeftOfBounds = state.currentPosition < 0;
@@ -2765,6 +2860,7 @@ function initCarousel(options = {}) {
                 elements.scroller.style.transition = "";
                 elements.scroller.style.cursor = "";
                 elements.scroller.style.userSelect = "";
+                elements.scroller.style.pointerEvents = "";
             }
         } catch (error) {
             console.error("Error destroying carousel:", error);
@@ -2785,6 +2881,30 @@ function initCarousel(options = {}) {
         next,
         prev,
         goToPage,
+
+        // New method to focus on specific item
+        focusOnItem: (itemIndex) => {
+            if (itemIndex < 0 || itemIndex >= state.totalCards) return false;
+
+            state.currentPosition = calculateFocusPositionForItem(itemIndex);
+
+            // Update current page
+            if (config.startCentered) {
+                state.currentPage = itemIndex;
+            } else {
+                const pageWidth = state.cardWidth * state.visibleCards;
+                state.currentPage =
+                    pageWidth > 0
+                        ? Math.min(
+                            Math.floor(state.currentPosition / pageWidth),
+                            state.totalPages - 1
+                        )
+                        : 0;
+            }
+
+            updateScrollPosition();
+            return true;
+        },
 
         // State getters
         getCurrentPage: () => state.currentPage,
