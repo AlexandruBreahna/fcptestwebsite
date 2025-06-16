@@ -880,7 +880,7 @@ function initVehicleSelector(config = {}) {
         // Focus on the first field with proper timing for dropdown
         if (elements.inputs[0]) {
             elements.inputs[0].focus();
-            
+
             // Force DOM update and then show dropdown
             requestAnimationFrame(() => {
                 currentFieldIndex = 0;
@@ -1124,50 +1124,50 @@ function initVehicleSelector(config = {}) {
 
     // Set vehicle configuration programmatically
     function setVehicleConfiguration(vehicleConfig, options = {}) {
-        const { 
-            triggerCallbacks = false, 
+        const {
+            triggerCallbacks = false,
             focusOnComplete = true,
-            validateData = true 
+            validateData = true
         } = options;
-        
+
         try {
             // Validate configuration if requested
             if (validateData && !isValidVehicleConfiguration(vehicleConfig)) {
                 console.error('Invalid vehicle configuration provided:', vehicleConfig);
                 return false;
             }
-            
+
             // Reset to initial state first
-            handleResetSelection({ preventDefault: () => {} }, true);
-            
+            handleResetSelection({ preventDefault: () => { } }, true);
+
             // Set values in the correct order
             let lastSetFieldIndex = -1;
-            
+
             fieldNames.forEach((fieldName, index) => {
                 if (vehicleConfig[fieldName]) {
                     const input = elements.inputs[index];
                     if (input) {
                         input.value = vehicleConfig[fieldName];
                         selectedValues[fieldName] = vehicleConfig[fieldName];
-                        
+
                         const group = input.closest(".vehicle-selector-input-group");
                         if (group) {
                             group.classList.add("completed");
                             group.classList.remove("active", "disabled");
                         }
-                        
+
                         lastSetFieldIndex = index;
                     }
                 }
             });
-            
+
             // Update intermediary summary
             updateIntermediarySummary();
-            
+
             // Switch to appropriate step and handle completion
             if (lastSetFieldIndex >= 0) {
                 const isComplete = fieldNames.every(fieldName => vehicleConfig[fieldName]);
-                
+
                 if (isComplete) {
                     switchToStep(2);
                     generateSummary(!triggerCallbacks);
@@ -1180,17 +1180,17 @@ function initVehicleSelector(config = {}) {
                     } else {
                         switchToStep(2);
                     }
-                    
+
                     if (nextFieldIndex < elements.inputs.length && focusOnComplete) {
                         enableField(nextFieldIndex);
                     }
                 }
             }
-            
+
             updateNavigationArrows();
             console.log('Vehicle configuration set successfully:', vehicleConfig);
             return true;
-            
+
         } catch (error) {
             console.error('Error setting vehicle configuration:', error);
             return false;
@@ -1517,7 +1517,7 @@ function initVehicleGarage(config = {}) {
                     }
                 }
             }
-            
+
             console.log('Vehicle garage initialized successfully');
         } catch (error) {
             console.error('Error initializing vehicle garage:', error);
@@ -1710,86 +1710,86 @@ function initVehicleGarage(config = {}) {
     // Select a vehicle (or deselect if already selected)
     function selectVehicle(vehicleId) {
         try {
-        // Find the vehicle
-        const vehicle = garageData.find(v => v.id === vehicleId);
-        if (!vehicle) return false;
-        
-        // Check if this vehicle is already selected
-        const isAlreadySelected = vehicle.selected;
-        
-        if (isAlreadySelected) {
-            // FIX: Deselect the vehicle if it's already selected
-            garageData.forEach(v => v.selected = false);
-            
-            // Save changes
-            saveGarageData();
-            
-            // Update UI
-            renderGarage();
-            
-            // Trigger removal callback to reset vehicle selector
-            if (typeof settings.onVehicleRemoved === 'function') {
-            settings.onVehicleRemoved(vehicle, true); // Reset vehicle selector
+            // Find the vehicle
+            const vehicle = garageData.find(v => v.id === vehicleId);
+            if (!vehicle) return false;
+
+            // Check if this vehicle is already selected
+            const isAlreadySelected = vehicle.selected;
+
+            if (isAlreadySelected) {
+                // FIX: Deselect the vehicle if it's already selected
+                garageData.forEach(v => v.selected = false);
+
+                // Save changes
+                saveGarageData();
+
+                // Update UI
+                renderGarage();
+
+                // Trigger removal callback to reset vehicle selector
+                if (typeof settings.onVehicleRemoved === 'function') {
+                    settings.onVehicleRemoved(vehicle, true); // Reset vehicle selector
+                }
+
+                console.log('Vehicle deselected:', vehicleId);
+                return true;
+            } else {
+                // Select the vehicle (deselect others)
+                garageData.forEach(v => {
+                    v.selected = v.id === vehicleId;
+                });
+
+                // Save changes
+                saveGarageData();
+
+                // Update UI
+                renderGarage();
+
+                // Trigger callback if provided
+                if (typeof settings.onVehicleSelected === 'function') {
+                    settings.onVehicleSelected(vehicle);
+                }
+
+                console.log('Vehicle selected:', vehicleId);
+                return true;
             }
-            
-            console.log('Vehicle deselected:', vehicleId);
-            return true;
-        } else {
-            // Select the vehicle (deselect others)
-            garageData.forEach(v => {
-            v.selected = v.id === vehicleId;
-            });
-            
-            // Save changes
-            saveGarageData();
-            
-            // Update UI
-            renderGarage();
-            
-            // Trigger callback if provided
-            if (typeof settings.onVehicleSelected === 'function') {
-            settings.onVehicleSelected(vehicle);
-            }
-            
-            console.log('Vehicle selected:', vehicleId);
-            return true;
-        }
         } catch (error) {
-        console.error('Error selecting vehicle:', error);
-        return false;
+            console.error('Error selecting vehicle:', error);
+            return false;
         }
     }
 
     // Remove a vehicle from garage and clear selection
     function removeVehicle(vehicleId) {
         try {
-        const vehicleIndex = garageData.findIndex(v => v.id === vehicleId);
-        
-        if (vehicleIndex === -1) return false;
-        
-        const wasSelected = garageData[vehicleIndex].selected;
-        const removedVehicle = garageData[vehicleIndex];
-        
-        // Remove vehicle
-        garageData.splice(vehicleIndex, 1);
-        
-        // FIX: Don't auto-select another vehicle - clear all selections
-        garageData.forEach(v => v.selected = false);
-        
-        // Save and render
-        saveGarageData();
-        renderGarage();
-        
-        // Trigger callback if provided (always pass true for wasSelected since we're clearing selection)
-        if (typeof settings.onVehicleRemoved === 'function') {
-            settings.onVehicleRemoved(removedVehicle, true); // Always reset vehicle selector
-        }
-        
-        console.log('Vehicle removed and selection cleared:', vehicleId);
-        return true;
+            const vehicleIndex = garageData.findIndex(v => v.id === vehicleId);
+
+            if (vehicleIndex === -1) return false;
+
+            const wasSelected = garageData[vehicleIndex].selected;
+            const removedVehicle = garageData[vehicleIndex];
+
+            // Remove vehicle
+            garageData.splice(vehicleIndex, 1);
+
+            // FIX: Don't auto-select another vehicle - clear all selections
+            garageData.forEach(v => v.selected = false);
+
+            // Save and render
+            saveGarageData();
+            renderGarage();
+
+            // Trigger callback if provided (always pass true for wasSelected since we're clearing selection)
+            if (typeof settings.onVehicleRemoved === 'function') {
+                settings.onVehicleRemoved(removedVehicle, true); // Always reset vehicle selector
+            }
+
+            console.log('Vehicle removed and selection cleared:', vehicleId);
+            return true;
         } catch (error) {
-        console.error('Error removing vehicle:', error);
-        return false;
+            console.error('Error removing vehicle:', error);
+            return false;
         }
     }
 
@@ -1892,46 +1892,46 @@ function initVehicleGarage(config = {}) {
     // Update jewel indicator with pop animation
     function updateJewelIndicator() {
         if (!jewelIndicator) return;
-        
+
         const count = garageData.length;
         const wasVisible = jewelIndicator.style.display !== 'none';
-        
+
         if (count >= 1) { // FIX: Show jewel when 1 or more vehicles (was > 1)
-        jewelIndicator.textContent = count.toString();
-        jewelIndicator.style.display = 'block';
-        
-        // Add pop animation effect when jewel becomes visible or count changes
-        if (!wasVisible || parseInt(jewelIndicator.textContent) !== count) {
-            animateJewelPop();
-        }
+            jewelIndicator.textContent = count.toString();
+            jewelIndicator.style.display = 'block';
+
+            // Add pop animation effect when jewel becomes visible or count changes
+            if (!wasVisible || parseInt(jewelIndicator.textContent) !== count) {
+                animateJewelPop();
+            }
         } else {
-        jewelIndicator.style.display = 'none';
+            jewelIndicator.style.display = 'none';
         }
     }
 
     // Animate jewel pop effect using JavaScript transitions
     function animateJewelPop() {
         if (!jewelIndicator) return;
-        
+
         // Store original transform
         const originalTransform = jewelIndicator.style.transform || '';
-        
+
         // Apply pop effect: scale up then back to normal
         jewelIndicator.style.transition = 'transform 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
         jewelIndicator.style.transform = 'scale(1.3)';
-        
+
         // Reset to normal size after animation
         setTimeout(() => {
-        if (jewelIndicator) {
-            jewelIndicator.style.transform = originalTransform;
-            
-            // Clean up transition after animation completes
-            setTimeout(() => {
             if (jewelIndicator) {
-                jewelIndicator.style.transition = '';
+                jewelIndicator.style.transform = originalTransform;
+
+                // Clean up transition after animation completes
+                setTimeout(() => {
+                    if (jewelIndicator) {
+                        jewelIndicator.style.transition = '';
+                    }
+                }, 200);
             }
-            }, 200);
-        }
         }, 150);
     }
 
@@ -2014,283 +2014,350 @@ function initVehicleGarage(config = {}) {
 function initCarousel(options = {}) {
     // Configuration with defaults
     const config = {
-       carouselId: "recommended-products",
-       showPagination: true,
-       mobileBreakpoint: 990,
-       animationDuration: 300,
-       startCentered: false,
-       ...options
+        carouselId: "recommended-products",
+        showPagination: true,
+        mobileBreakpoint: 990,
+        animationDuration: 300,
+        startCentered: false,
+        ...options
     };
- 
+
     // State object to hold all dynamic values
     const state = {
-       currentPosition: 0,
-       maxPosition: 0,
-       cardWidth: 0,
-       visibleCards: 0,
-       totalCards: 0,
-       totalPages: 0,
-       currentPage: 0,
-       isDesktop: true,
-       isDragging: false,
-       startX: 0,
-       startScrollLeft: 0,
-       resizeTimeout: null
+        currentPosition: 0,
+        maxPosition: 0,
+        cardWidth: 0,
+        visibleCards: 0,
+        totalCards: 0,
+        totalPages: 0,
+        currentPage: 0,
+        isDesktop: true,
+        isDragging: false,
+        startX: 0,
+        startScrollLeft: 0,
+        resizeTimeout: null
     };
- 
+
     // DOM elements (initialized in init)
     const elements = {};
- 
+
     // Initialize carousel
     function init() {
         try {
-        // Get DOM elements
-        elements.carousel = document.getElementById(config.carouselId);
-        if (!elements.carousel) {
-            console.warn(`Carousel with ID "${config.carouselId}" not found`);
-            return false;
-        }
-    
-        elements.wrapper = elements.carousel.querySelector('.carousel-widget-wrapper');
-        elements.scroller = elements.carousel.querySelector('.carousel-widget-scroller');
-        elements.leftArrow = elements.carousel.querySelector('.carousel-widget-arrow-left');
-        elements.rightArrow = elements.carousel.querySelector('.carousel-widget-arrow-right');
-        elements.pagination = elements.carousel.querySelector('.carousel-widget-pagination');
-        
-        // Get all direct children of scroller instead of specific class
-        elements.productCards = elements.scroller.children;
-    
-        if (!elements.wrapper || !elements.scroller || !elements.productCards.length) {
-            console.warn('Required carousel elements not found');
-            return false;
-        }
-    
-        state.totalCards = elements.productCards.length;
-        
-        // Initial setup
-        calculateDimensions();
-        setupEventListeners();
-        updateUI();
-        
-        return true;
+            // Get DOM elements
+            elements.carousel = document.getElementById(config.carouselId);
+            if (!elements.carousel) {
+                console.warn(`Carousel with ID "${config.carouselId}" not found`);
+                return false;
+            }
+
+            elements.wrapper = elements.carousel.querySelector(
+                ".carousel-widget-wrapper"
+            );
+            elements.scroller = elements.carousel.querySelector(
+                ".carousel-widget-scroller"
+            );
+            elements.leftArrow = elements.carousel.querySelector(
+                ".carousel-widget-arrow-left"
+            );
+            elements.rightArrow = elements.carousel.querySelector(
+                ".carousel-widget-arrow-right"
+            );
+            elements.pagination = elements.carousel.querySelector(
+                ".carousel-widget-pagination"
+            );
+
+            // Get all direct children of scroller instead of specific class
+            elements.productCards = elements.scroller.children;
+
+            if (
+                !elements.wrapper ||
+                !elements.scroller ||
+                !elements.productCards.length
+            ) {
+                console.warn("Required carousel elements not found");
+                return false;
+            }
+
+            state.totalCards = elements.productCards.length;
+
+            // Initial setup
+            calculateDimensions();
+            setupEventListeners();
+            updateUI();
+
+            // Apply centered position after DOM layout is complete
+            if (config.startCentered) {
+                requestAnimationFrame(() => {
+                    // Recalculate dimensions to ensure accurate measurements
+                    calculateDimensions();
+                    state.currentPosition = calculateCenteredPosition();
+                    updateScrollPosition(false); // No animation for initial positioning
+                });
+            }
+
+            return true;
         } catch (error) {
-        console.error('Error initializing carousel:', error);
-        return false;
+            console.error("Error initializing carousel:", error);
+            return false;
         }
     }
- 
+
     // Calculate carousel dimensions and positions
     function calculateDimensions() {
         // Account for wrapper padding (8px) that affects the effective scroll area
         const wrapperPadding = 8;
-        const wrapperWidth = elements.wrapper.offsetWidth - (wrapperPadding * 2);
+        const wrapperWidth = elements.wrapper.offsetWidth - wrapperPadding * 2;
         const scrollerWidth = elements.scroller.scrollWidth;
-        
+
         // Get computed card width including gap
         if (elements.productCards.length > 0) {
-        const cardRect = elements.productCards[0].getBoundingClientRect();
-        const cardStyle = getComputedStyle(elements.productCards[0]);
-        const marginRight = parseFloat(cardStyle.marginRight) || 0;
-        state.cardWidth = cardRect.width + marginRight;
+            const cardRect = elements.productCards[0].getBoundingClientRect();
+            const cardStyle = getComputedStyle(elements.productCards[0]);
+            const marginRight = parseFloat(cardStyle.marginRight) || 0;
+            state.cardWidth = cardRect.width + marginRight;
         }
-    
-        // Calculate visible cards based on effective wrapper width
-        state.visibleCards = Math.floor(wrapperWidth / state.cardWidth);
-        if (state.visibleCards === 0) state.visibleCards = 1;
-    
+
+        // Calculate visible cards and pages based on carousel type
+        if (config.startCentered) {
+            // For centered carousels, each item is a page
+            state.visibleCards = 1;
+            state.totalPages = state.totalCards;
+        } else {
+            // Normal carousel behavior
+            state.visibleCards = Math.floor(wrapperWidth / state.cardWidth);
+            if (state.visibleCards === 0) state.visibleCards = 1;
+            state.totalPages = Math.ceil(state.totalCards / state.visibleCards);
+            if (state.totalPages === 0) state.totalPages = 1;
+        }
+
         // Calculate maximum scroll position accounting for wrapper padding
         state.maxPosition = Math.max(0, scrollerWidth - wrapperWidth);
-        
-        // Calculate total pages - ensure at least 1 page
-        state.totalPages = Math.ceil(state.totalCards / state.visibleCards);
-        if (state.totalPages === 0) state.totalPages = 1;
-    
+
         // Check if desktop view
         state.isDesktop = window.innerWidth >= config.mobileBreakpoint;
-        
-        // Set initial centered position if configured
-        if (config.startCentered) {
-        state.currentPosition = calculateCenteredPosition();
-        }
     }
 
-    // Calculate centered starting position
-    function calculateCenteredPosition() {
-        if (!config.startCentered) return 0;
+    // Calculate position to center a specific item in the wrapper
+    function calculateCenteredPositionForItem(itemIndex) {
+        if (!config.startCentered || !elements.productCards.length) return 0;
 
         const wrapperPadding = 8;
-        const wrapperWidth = elements.wrapper.offsetWidth - (wrapperPadding * 2);
-        const scrollerWidth = elements.scroller.scrollWidth;
+        const wrapperWidth = elements.wrapper.offsetWidth - wrapperPadding * 2;
+        const wrapperCenter = wrapperWidth / 2;
 
-        // Center the content if it's wider than the wrapper
-        if (scrollerWidth > wrapperWidth) {
-            return Math.max(0, (scrollerWidth - wrapperWidth) / 2);
+        // Get the item's position and width
+        const item = elements.productCards[itemIndex];
+        if (!item) return 0;
+
+        // Calculate item position relative to scroller start (without current scroll offset)
+        let itemLeft = 0;
+        for (let i = 0; i < itemIndex; i++) {
+            const prevItem = elements.productCards[i];
+            const prevItemStyle = getComputedStyle(prevItem);
+            const gap =
+                parseFloat(prevItemStyle.marginRight) ||
+                parseFloat(getComputedStyle(elements.scroller).columnGap) ||
+                parseFloat(getComputedStyle(elements.scroller).gap) ||
+                0;
+            itemLeft += prevItem.offsetWidth + gap;
         }
 
-        return 0;
+        const itemWidth = item.offsetWidth;
+        const itemCenter = itemLeft + itemWidth / 2;
+
+        // Calculate scroll position to center this item
+        const targetScrollPosition = itemCenter - wrapperCenter;
+
+        // Constrain within bounds
+        return Math.max(0, Math.min(state.maxPosition, targetScrollPosition));
     }
- 
+
+    // Calculate initial centered position (centers first item)
+    function calculateCenteredPosition() {
+        return calculateCenteredPositionForItem(0);
+    }
+
     // Setup event listeners - ensure mobile touch events work properly
     function setupEventListeners() {
-       // Arrow navigation (desktop only)
-       if (elements.leftArrow) {
-          elements.leftArrow.addEventListener("click", handleLeftClick);
-       }
-       if (elements.rightArrow) {
-          elements.rightArrow.addEventListener("click", handleRightClick);
-       }
- 
-       // Touch/drag events - ensure mobile compatibility
-       if (elements.scroller) {
-          // Mouse events for desktop dragging
-          elements.scroller.addEventListener("mousedown", handleDragStart);
-          document.addEventListener("mousemove", handleDragMove); // Listen on document for better mobile support
-          document.addEventListener("mouseup", handleDragEnd);
- 
-          // Touch events for mobile - with proper event handling
-          elements.scroller.addEventListener("touchstart", handleDragStart, {
-             passive: false
-          });
-          document.addEventListener("touchmove", handleDragMove, {
-             passive: false
-          }); // Listen on document
-          document.addEventListener("touchend", handleDragEnd, {
-             passive: false
-          });
- 
-          // Prevent context menu during drag
-          elements.scroller.addEventListener("contextmenu", (e) => {
-             if (state.isDragging) e.preventDefault();
-          });
-       }
- 
-       // Pagination clicks
-       if (elements.pagination && config.showPagination) {
-          elements.pagination.addEventListener("click", handlePaginationClick);
-       }
- 
-       // Window resize with debounce
-       window.addEventListener("resize", debounce(handleResize, 250));
+        // Arrow navigation (desktop only)
+        if (elements.leftArrow) {
+            elements.leftArrow.addEventListener("click", handleLeftClick);
+        }
+        if (elements.rightArrow) {
+            elements.rightArrow.addEventListener("click", handleRightClick);
+        }
+
+        // Touch/drag events - ensure mobile compatibility
+        if (elements.scroller) {
+            // Mouse events for desktop dragging
+            elements.scroller.addEventListener("mousedown", handleDragStart);
+            document.addEventListener("mousemove", handleDragMove); // Listen on document for better mobile support
+            document.addEventListener("mouseup", handleDragEnd);
+
+            // Touch events for mobile - with proper event handling
+            elements.scroller.addEventListener("touchstart", handleDragStart, {
+                passive: false
+            });
+            document.addEventListener("touchmove", handleDragMove, {
+                passive: false
+            }); // Listen on document
+            document.addEventListener("touchend", handleDragEnd, {
+                passive: false
+            });
+
+            // Prevent context menu during drag
+            elements.scroller.addEventListener("contextmenu", (e) => {
+                if (state.isDragging) e.preventDefault();
+            });
+        }
+
+        // Pagination clicks
+        if (elements.pagination && config.showPagination) {
+            elements.pagination.addEventListener("click", handlePaginationClick);
+        }
+        elements.scroller.style.touchAction = 'pan-x';
+
+        // Window resize with debounce
+        window.addEventListener("resize", debounce(handleResize, 250));
     }
- 
+
     // Handle left arrow click
     function handleLeftClick(e) {
-       e.preventDefault();
-       if (!state.isDesktop || state.currentPosition <= 0) return;
- 
-       // Use actual card width including gap for consistency with drag snapping
-       let actualCardWidth = state.cardWidth;
-       if (elements.productCards.length > 0) {
-          const cardRect = elements.productCards[0].getBoundingClientRect();
-          const scrollerStyle = getComputedStyle(elements.scroller);
-          const gap =
-             parseFloat(scrollerStyle.columnGap) ||
-             parseFloat(scrollerStyle.gap) ||
-             8;
-          actualCardWidth = cardRect.width + gap;
-       }
- 
-       const moveDistance = Math.min(
-          actualCardWidth * state.visibleCards,
-          state.currentPosition
-       );
-       state.currentPosition -= moveDistance;
-       updateScrollPosition();
+        e.preventDefault();
+
+        if (config.startCentered) {
+            // For centered carousels, navigate by page
+            if (state.currentPage > 0) {
+                goToPage(state.currentPage - 1);
+            }
+        } else {
+            // For non-centered carousels
+            if (!state.isDesktop || state.currentPosition <= 0) return;
+
+            let actualCardWidth = state.cardWidth;
+            if (elements.productCards.length > 0) {
+                const cardRect = elements.productCards[0].getBoundingClientRect();
+                const scrollerStyle = getComputedStyle(elements.scroller);
+                const gap =
+                    parseFloat(scrollerStyle.columnGap) ||
+                    parseFloat(scrollerStyle.gap) ||
+                    8;
+                actualCardWidth = cardRect.width + gap;
+            }
+
+            const moveDistance = Math.min(
+                actualCardWidth * state.visibleCards,
+                state.currentPosition
+            );
+            state.currentPosition -= moveDistance;
+            updateScrollPosition();
+        }
     }
- 
+
     // Handle right arrow click
     function handleRightClick(e) {
-       e.preventDefault();
-       if (!state.isDesktop || state.currentPosition >= state.maxPosition)
-          return;
- 
-       // Use actual card width including gap for consistency with drag snapping
-       let actualCardWidth = state.cardWidth;
-       if (elements.productCards.length > 0) {
-          const cardRect = elements.productCards[0].getBoundingClientRect();
-          const scrollerStyle = getComputedStyle(elements.scroller);
-          const gap =
-             parseFloat(scrollerStyle.columnGap) ||
-             parseFloat(scrollerStyle.gap) ||
-             8;
-          actualCardWidth = cardRect.width + gap;
-       }
- 
-       const moveDistance = Math.min(
-          actualCardWidth * state.visibleCards,
-          state.maxPosition - state.currentPosition
-       );
-       state.currentPosition += moveDistance;
-       updateScrollPosition();
+        e.preventDefault();
+
+        if (config.startCentered) {
+            // For centered carousels, navigate by page
+            if (state.currentPage < state.totalPages - 1) {
+                goToPage(state.currentPage + 1);
+            }
+        } else {
+            // For non-centered carousels
+            if (!state.isDesktop || state.currentPosition >= state.maxPosition)
+                return;
+
+            let actualCardWidth = state.cardWidth;
+            if (elements.productCards.length > 0) {
+                const cardRect = elements.productCards[0].getBoundingClientRect();
+                const scrollerStyle = getComputedStyle(elements.scroller);
+                const gap =
+                    parseFloat(scrollerStyle.columnGap) ||
+                    parseFloat(scrollerStyle.gap) ||
+                    8;
+                actualCardWidth = cardRect.width + gap;
+            }
+
+            const moveDistance = Math.min(
+                actualCardWidth * state.visibleCards,
+                state.maxPosition - state.currentPosition
+            );
+            state.currentPosition += moveDistance;
+            updateScrollPosition();
+        }
     }
- 
+
     // Handle drag start - works on both desktop and mobile with better mobile optimization
     function handleDragStart(e) {
-       state.isDragging = true;
-       state.startX = e.type === "mousedown" ? e.clientX : e.touches[0].clientX;
-       state.startScrollLeft = state.currentPosition;
- 
-       // Visual feedback for dragging
-       elements.scroller.style.cursor = "grabbing";
-       elements.scroller.style.userSelect = "none";
- 
-       // Prevent default to avoid text selection on desktop
-       if (e.type === "mousedown") {
-          e.preventDefault();
-       }
- 
-       // Remove any existing transitions for immediate response
-       elements.scroller.style.transition = "none";
+        state.isDragging = true;
+        state.startX = e.type === "mousedown" ? e.clientX : e.touches[0].clientX;
+        state.startScrollLeft = state.currentPosition;
+
+        // Visual feedback for dragging
+        elements.scroller.style.cursor = "grabbing";
+        elements.scroller.style.userSelect = "none";
+
+        // Disable pointer events on children to prevent clicks during drag
+        elements.scroller.style.pointerEvents = "none";
+
+        // Prevent default to avoid text selection on desktop
+        if (e.type === "mousedown") {
+            e.preventDefault();
+        }
+
+        // Remove any existing transitions for immediate response
+        elements.scroller.style.transition = "none";
     }
- 
+
     // Handle drag move - optimized for fluid mobile scrolling
+    let animationFrame;
     function handleDragMove(e) {
-       if (!state.isDragging) return;
- 
-       e.preventDefault();
-       const currentX =
-          e.type === "mousemove" ? e.clientX : e.touches[0].clientX;
-       const deltaX = state.startX - currentX;
-       const newPosition = state.startScrollLeft + deltaX;
- 
-       let constrainedPosition;
-       let transformValue;
- 
-       // Reduced elasticity for more fluid feel on mobile
-       const elasticity = state.isDesktop ? 0.3 : 0.5; // Higher elasticity on mobile
- 
-       if (newPosition < 0) {
-          // Past left boundary - elastic resistance
-          const overscroll = Math.abs(newPosition);
-          constrainedPosition = -overscroll * elasticity;
-          // Move content RIGHT (positive transform) to show elastic space on left
-          transformValue = Math.abs(constrainedPosition);
-          elements.scroller.style.transform = `translateX(${transformValue}px)`;
-       } else if (newPosition > state.maxPosition) {
-          // Past right boundary - elastic resistance
-          const overscroll = newPosition - state.maxPosition;
-          constrainedPosition = state.maxPosition + overscroll * elasticity;
-          // Move content LEFT (negative transform) to show elastic space on right
-          transformValue = constrainedPosition;
-          elements.scroller.style.transform = `translateX(-${transformValue}px)`;
-       } else {
-          // Within normal bounds - store actual position for pagination
-          constrainedPosition = newPosition;
-          transformValue = constrainedPosition;
-          elements.scroller.style.transform = `translateX(-${transformValue}px)`;
-       }
- 
-       // Always update state position for proper pagination tracking
-       state.currentPosition = constrainedPosition;
+        if (!state.isDragging) return;
+
+        e.preventDefault();
+        const currentX =
+            e.type === "mousemove" ? e.clientX : e.touches[0].clientX;
+        const deltaX = state.startX - currentX;
+        const newPosition = state.startScrollLeft + deltaX;
+
+        let constrainedPosition;
+        let transformValue;
+
+        const elasticity = state.isDesktop ? 0.3 : 0.7; // Higher elasticity on mobile
+
+        if (newPosition < 0) {
+            const overscroll = Math.abs(newPosition);
+            constrainedPosition = -overscroll * elasticity;
+            transformValue = Math.abs(constrainedPosition);
+            elements.scroller.style.transform = `translateX(${transformValue}px)`;
+        } else if (newPosition > state.maxPosition) {
+            const overscroll = newPosition - state.maxPosition;
+            constrainedPosition = state.maxPosition + overscroll * elasticity;
+            transformValue = constrainedPosition;
+            elements.scroller.style.transform = `translateX(-${transformValue}px)`;
+        } else {
+            constrainedPosition = newPosition;
+            transformValue = constrainedPosition;
+            elements.scroller.style.transform = `translateX(-${transformValue}px)`;
+        }
+
+        state.currentPosition = constrainedPosition;
+
     }
- 
-    // Handle drag end - conditional snapping based on startCentered config
+
     function handleDragEnd() {
         if (!state.isDragging) return;
 
         state.isDragging = false;
-        elements.scroller.style.cursor = '';
-        elements.scroller.style.userSelect = '';
+        elements.scroller.style.cursor = "";
+        elements.scroller.style.userSelect = "";
+
+        // Re-enable pointer events on children
+        setTimeout(() => {
+            elements.scroller.style.pointerEvents = "";
+        }, 100);
 
         // Check if we're outside bounds
         const isLeftOfBounds = state.currentPosition < 0;
@@ -2302,335 +2369,445 @@ function initCarousel(options = {}) {
         if (wasOutOfBounds) {
             // Always bounce back to boundaries
             snapPosition = isLeftOfBounds ? 0 : state.maxPosition;
+            // Update currentPage for centered carousels when bouncing back
+            if (config.startCentered) {
+                state.currentPage = isLeftOfBounds ? 0 : state.totalPages - 1;
+            }
         } else if (config.startCentered) {
-            // If startCentered is enabled, don't snap to grid - use current position
-            snapPosition = state.currentPosition;
+            // For centered carousels, find which item should be centered based on current position
+            const wrapperPadding = 8;
+            const wrapperWidth = elements.wrapper.offsetWidth - wrapperPadding * 2;
+            const wrapperCenter = wrapperWidth / 2;
+            const currentViewCenter = state.currentPosition + wrapperCenter;
+
+            // Find the item that should be centered based on scroll position
+            let targetItemIndex = 0;
+            let cumulativeWidth = 0;
+
+            for (let i = 0; i < elements.productCards.length; i++) {
+                const item = elements.productCards[i];
+                const itemWidth = item.offsetWidth;
+                const itemStyle = getComputedStyle(item);
+                const gap =
+                    parseFloat(itemStyle.marginRight) ||
+                    parseFloat(getComputedStyle(elements.scroller).columnGap) ||
+                    parseFloat(getComputedStyle(elements.scroller).gap) ||
+                    0;
+
+                const itemCenter = cumulativeWidth + itemWidth / 2;
+
+                if (Math.abs(itemCenter - currentViewCenter) < itemWidth / 2) {
+                    targetItemIndex = i;
+                    break;
+                }
+
+                cumulativeWidth += itemWidth + gap;
+
+                // If we've gone past all items, select the last one
+                if (i === elements.productCards.length - 1) {
+                    targetItemIndex = i;
+                }
+            }
+
+            // Consider drag velocity for more natural snapping
+            const dragVelocity = state.currentPosition - state.startScrollLeft;
+            const velocityThreshold = 50; // Pixel threshold for velocity
+
+            if (Math.abs(dragVelocity) > velocityThreshold) {
+                if (
+                    dragVelocity > 0 &&
+                    targetItemIndex < elements.productCards.length - 1
+                ) {
+                    targetItemIndex++; // Next item
+                } else if (dragVelocity < 0 && targetItemIndex > 0) {
+                    targetItemIndex--; // Previous item
+                }
+            }
+
+            // Constrain to valid range (no infinite scroll)
+            targetItemIndex = Math.max(
+                0,
+                Math.min(elements.productCards.length - 1, targetItemIndex)
+            );
+
+            snapPosition = calculateCenteredPositionForItem(targetItemIndex);
+            state.currentPage = targetItemIndex;
         } else {
-            // Normal card snapping within bounds
+            // Normal card snapping for regular carousels
             let actualCardWidth = state.cardWidth;
             if (elements.productCards.length > 0) {
                 const cardRect = elements.productCards[0].getBoundingClientRect();
                 const scrollerStyle = getComputedStyle(elements.scroller);
-                const gap = parseFloat(scrollerStyle.columnGap) || parseFloat(scrollerStyle.gap) || 8;
+                const gap =
+                    parseFloat(scrollerStyle.columnGap) ||
+                    parseFloat(scrollerStyle.gap) ||
+                    8;
                 actualCardWidth = cardRect.width + gap;
             }
 
             const cardIndex = Math.round(state.currentPosition / actualCardWidth);
             snapPosition = cardIndex * actualCardWidth;
 
-            // Velocity-based snapping for natural feel
             const dragVelocity = state.currentPosition - state.startScrollLeft;
-            const velocityThreshold = state.isDesktop ? actualCardWidth * 0.3 : actualCardWidth * 0.2;
+            const velocityThreshold = state.isDesktop
+                ? actualCardWidth * 0.3
+                : actualCardWidth * 0.2;
 
             if (Math.abs(dragVelocity) > velocityThreshold) {
                 if (dragVelocity > 0) {
-                    snapPosition = Math.ceil(state.currentPosition / actualCardWidth) * actualCardWidth;
+                    snapPosition =
+                        Math.ceil(state.currentPosition / actualCardWidth) *
+                        actualCardWidth;
                 } else {
-                    snapPosition = Math.floor(state.currentPosition / actualCardWidth) * actualCardWidth;
+                    snapPosition =
+                        Math.floor(state.currentPosition / actualCardWidth) *
+                        actualCardWidth;
                 }
             }
 
-            // Keep within bounds
             snapPosition = Math.max(0, Math.min(state.maxPosition, snapPosition));
         }
 
         // Update position with appropriate animation
         state.currentPosition = snapPosition;
 
-        // Faster, more responsive animations on mobile
-        const easing = wasOutOfBounds ? 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'ease-out';
-        const baseDuration = state.isDesktop ? config.animationDuration : config.animationDuration * 0.8;
+        const easing = wasOutOfBounds
+            ? "cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+            : "ease-out";
+        const baseDuration = state.isDesktop
+            ? config.animationDuration
+            : config.animationDuration * 0.8;
         const duration = wasOutOfBounds ? baseDuration * 1.3 : baseDuration;
 
         elements.scroller.style.transition = `transform ${duration}ms ${easing}`;
         elements.scroller.style.transform = `translateX(-${state.currentPosition}px)`;
 
-        // Update pagination
-        const constrainedPosition = Math.max(0, Math.min(state.maxPosition, state.currentPosition));
+        // Update pagination for non-centered carousels
+        if (!config.startCentered) {
+            const constrainedPosition = Math.max(
+                0,
+                Math.min(state.maxPosition, state.currentPosition)
+            );
 
-        if (state.isDesktop) {
-            const pageWidth = state.cardWidth * state.visibleCards;
-            state.currentPage = pageWidth > 0 ? Math.min(Math.floor(constrainedPosition / pageWidth), state.totalPages - 1) : 0;
-        } else {
-            state.currentPage = state.maxPosition === 0 ? 0 : Math.round((constrainedPosition / state.maxPosition) * (state.totalPages - 1));
+            if (state.isDesktop) {
+                const pageWidth = state.cardWidth * state.visibleCards;
+                state.currentPage =
+                    pageWidth > 0
+                        ? Math.min(
+                            Math.floor(constrainedPosition / pageWidth),
+                            state.totalPages - 1
+                        )
+                        : 0;
+            } else {
+                state.currentPage =
+                    state.maxPosition === 0
+                        ? 0
+                        : Math.round(
+                            (constrainedPosition / state.maxPosition) *
+                            (state.totalPages - 1)
+                        );
+            }
         }
 
         updateUI();
     }
- 
+
     // Handle pagination click
     function handlePaginationClick(e) {
-       e.preventDefault();
-       const pageElement = e.target.closest(".carousel-widget-page");
-       if (!pageElement) return;
- 
-       const pages = elements.pagination.querySelectorAll(
-          ".carousel-widget-page"
-       );
-       const clickedIndex = Array.from(pages).indexOf(pageElement);
- 
-       if (clickedIndex !== -1 && clickedIndex !== state.currentPage) {
-          goToPage(clickedIndex);
-       }
+        e.preventDefault();
+        const pageElement = e.target.closest(".carousel-widget-page");
+        if (!pageElement) return;
+
+        const pages = elements.pagination.querySelectorAll(
+            ".carousel-widget-page"
+        );
+        const clickedIndex = Array.from(pages).indexOf(pageElement);
+
+        if (clickedIndex !== -1 && clickedIndex !== state.currentPage) {
+            goToPage(clickedIndex);
+        }
     }
- 
+
     // Go to specific page
     function goToPage(pageIndex) {
-       if (pageIndex < 0 || pageIndex >= state.totalPages) return false;
- 
-       state.currentPage = pageIndex;
- 
-       if (state.isDesktop) {
-          // For desktop, move by card groups
-          const targetPosition = Math.min(
-             pageIndex * state.cardWidth * state.visibleCards,
-             state.maxPosition
-          );
-          state.currentPosition = targetPosition;
-       } else {
-          // For mobile, distribute scroll range across pages
-          const scrollPerPage = state.maxPosition / (state.totalPages - 1);
-          state.currentPosition =
-             pageIndex === state.totalPages - 1
-                ? state.maxPosition
-                : pageIndex * scrollPerPage;
-       }
- 
-       updateScrollPosition();
-       return true;
+        if (pageIndex < 0 || pageIndex >= state.totalPages) return false;
+
+        state.currentPage = pageIndex;
+
+        if (config.startCentered) {
+            // For centered carousels, center the specific item
+            state.currentPosition = calculateCenteredPositionForItem(pageIndex);
+        } else if (state.isDesktop) {
+            // For desktop, move by card groups
+            const targetPosition = Math.min(
+                pageIndex * state.cardWidth * state.visibleCards,
+                state.maxPosition
+            );
+            state.currentPosition = targetPosition;
+        } else {
+            // For mobile, distribute scroll range across pages
+            const scrollPerPage = state.maxPosition / (state.totalPages - 1);
+            state.currentPosition =
+                pageIndex === state.totalPages - 1
+                    ? state.maxPosition
+                    : pageIndex * scrollPerPage;
+        }
+
+        updateScrollPosition();
+        return true;
     }
- 
+
     // Update scroll position
     function updateScrollPosition(smooth = true) {
-       if (!elements.scroller) return;
- 
-       // Apply transform
-       elements.scroller.style.transition = smooth
-          ? `transform ${config.animationDuration}ms ease-out`
-          : "none";
-       elements.scroller.style.transform = `translateX(-${state.currentPosition}px)`;
- 
-       // Update current page based on position
-       if (state.isDesktop) {
-          const pageWidth = state.cardWidth * state.visibleCards;
-          state.currentPage =
-             pageWidth > 0
-                ? Math.min(
-                     Math.floor(state.currentPosition / pageWidth),
-                     state.totalPages - 1
-                  )
-                : 0;
-       } else {
-          state.currentPage =
-             state.maxPosition === 0
-                ? 0
-                : Math.round(
-                     (state.currentPosition / state.maxPosition) *
-                        (state.totalPages - 1)
-                  );
-       }
- 
-       updateUI();
+        if (!elements.scroller) return;
+
+        // Apply transform
+        elements.scroller.style.transition = smooth
+            ? `transform ${config.animationDuration}ms ease-out`
+            : "none";
+        elements.scroller.style.transform = `translateX(-${state.currentPosition}px)`;
+
+        // Update current page based on position - only for non-centered carousels
+        if (!config.startCentered) {
+            if (state.isDesktop) {
+                const pageWidth = state.cardWidth * state.visibleCards;
+                state.currentPage =
+                    pageWidth > 0
+                        ? Math.min(
+                            Math.floor(state.currentPosition / pageWidth),
+                            state.totalPages - 1
+                        )
+                        : 0;
+            } else {
+                state.currentPage =
+                    state.maxPosition === 0
+                        ? 0
+                        : Math.round(
+                            (state.currentPosition / state.maxPosition) *
+                            (state.totalPages - 1)
+                        );
+            }
+        }
+
+        updateUI();
     }
- 
+
     // Update all UI elements
     function updateUI() {
-       updateArrowStates();
-       updatePaginationStates();
+        updateArrowStates();
+        updatePaginationStates();
     }
- 
+
     // Update arrow visibility and states
     function updateArrowStates() {
-       if (!elements.leftArrow || !elements.rightArrow) return;
- 
-       if (state.isDesktop) {
-          elements.leftArrow.style.display = "block";
-          elements.rightArrow.style.display = "block";
- 
-          // Add/remove disabled class for styling
-          elements.leftArrow.classList.toggle(
-             "disabled",
-             state.currentPosition <= 0
-          );
-          elements.rightArrow.classList.toggle(
-             "disabled",
-             state.currentPosition >= state.maxPosition
-          );
-       } else {
-          elements.leftArrow.style.display = "none";
-          elements.rightArrow.style.display = "none";
-       }
+        if (!elements.leftArrow || !elements.rightArrow) return;
+
+        if (state.isDesktop) {
+            elements.leftArrow.style.display = "block";
+            elements.rightArrow.style.display = "block";
+
+            if (config.startCentered) {
+                // For centered carousels, check page-based navigation
+                elements.leftArrow.classList.toggle(
+                    "disabled",
+                    state.currentPage <= 0
+                );
+                elements.rightArrow.classList.toggle(
+                    "disabled",
+                    state.currentPage >= state.totalPages - 1
+                );
+            } else {
+                // For non-centered carousels, check scroll position with small tolerance
+                const tolerance = 1; // 1px tolerance for floating point precision
+                elements.leftArrow.classList.toggle(
+                    "disabled",
+                    state.currentPosition <= tolerance
+                );
+                elements.rightArrow.classList.toggle(
+                    "disabled",
+                    state.currentPosition >= state.maxPosition - tolerance
+                );
+            }
+        } else {
+            elements.leftArrow.style.display = "none";
+            elements.rightArrow.style.display = "none";
+        }
     }
- 
+
     // Generate pagination dots
     function generatePagination() {
-       if (!elements.pagination || !config.showPagination) {
-          if (elements.pagination) elements.pagination.style.display = "none";
-          return;
-       }
- 
-       elements.pagination.style.display = "flex";
-       elements.pagination.innerHTML = "";
- 
-       // Create pagination dots
-       for (let i = 0; i < state.totalPages; i++) {
-          const dot = document.createElement("a");
-          dot.href = "#";
-          dot.className = "carousel-widget-page";
-          if (i === state.currentPage) {
-             dot.classList.add("selected");
-          }
-          elements.pagination.appendChild(dot);
-       }
+        if (!elements.pagination || !config.showPagination) {
+            if (elements.pagination) elements.pagination.style.display = "none";
+            return;
+        }
+
+        elements.pagination.style.display = "flex";
+        elements.pagination.innerHTML = "";
+
+        // Create pagination dots
+        for (let i = 0; i < state.totalPages; i++) {
+            const dot = document.createElement("a");
+            dot.href = "#";
+            dot.className = "carousel-widget-page";
+            if (i === state.currentPage) {
+                dot.classList.add("selected");
+            }
+            elements.pagination.appendChild(dot);
+        }
     }
- 
+
     // Update pagination states
     function updatePaginationStates() {
-       if (!elements.pagination || !config.showPagination) return;
- 
-       const pages = elements.pagination.querySelectorAll(
-          ".carousel-widget-page"
-       );
-       pages.forEach((page, index) => {
-          page.classList.toggle("selected", index === state.currentPage);
-       });
+        if (!elements.pagination || !config.showPagination) return;
+
+        const pages = elements.pagination.querySelectorAll(
+            ".carousel-widget-page"
+        );
+        pages.forEach((page, index) => {
+            page.classList.toggle("selected", index === state.currentPage);
+        });
     }
- 
+
     // Handle window resize
     function handleResize() {
-       calculateDimensions();
- 
-       // Reset position if it exceeds new max
-       if (state.currentPosition > state.maxPosition) {
-          state.currentPosition = state.maxPosition;
-       }
- 
-       updateScrollPosition();
-       generatePagination();
+        calculateDimensions();
+
+        // Reset position if it exceeds new max
+        if (state.currentPosition > state.maxPosition) {
+            state.currentPosition = state.maxPosition;
+        }
+
+        // Recenter if startCentered is enabled
+        if (config.startCentered) {
+            state.currentPosition = calculateCenteredPosition();
+        }
+
+        updateScrollPosition();
+        generatePagination();
     }
- 
+
     // Navigate to next slide
     function next() {
-       if (state.currentPage < state.totalPages - 1) {
-          return goToPage(state.currentPage + 1);
-       }
-       return false;
+        if (state.currentPage < state.totalPages - 1) {
+            return goToPage(state.currentPage + 1);
+        }
+        return false;
     }
- 
+
     // Navigate to previous slide
     function prev() {
-       if (state.currentPage > 0) {
-          return goToPage(state.currentPage - 1);
-       }
-       return false;
+        if (state.currentPage > 0) {
+            return goToPage(state.currentPage - 1);
+        }
+        return false;
     }
- 
+
     // Refresh carousel (recalculate dimensions)
     function refresh() {
-       calculateDimensions();
-       updateScrollPosition();
-       generatePagination();
+        calculateDimensions();
+        updateScrollPosition();
+        generatePagination();
     }
- 
+
     // Debounce utility
     function debounce(func, wait) {
-       return function executedFunction(...args) {
-          const later = () => {
-             clearTimeout(state.resizeTimeout);
-             func.apply(this, args);
-          };
-          clearTimeout(state.resizeTimeout);
-          state.resizeTimeout = setTimeout(later, wait);
-       };
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(state.resizeTimeout);
+                func.apply(this, args);
+            };
+            clearTimeout(state.resizeTimeout);
+            state.resizeTimeout = setTimeout(later, wait);
+        };
     }
- 
+
     // Cleanup function - updated to clean up document listeners
     function destroy() {
-       try {
-          // Remove event listeners
-          if (elements.leftArrow)
-             elements.leftArrow.removeEventListener("click", handleLeftClick);
-          if (elements.rightArrow)
-             elements.rightArrow.removeEventListener("click", handleRightClick);
-          if (elements.scroller) {
-             elements.scroller.removeEventListener("mousedown", handleDragStart);
-             elements.scroller.removeEventListener(
-                "touchstart",
-                handleDragStart
-             );
-             elements.scroller.removeEventListener(
-                "contextmenu",
-                handleDragStart
-             );
-          }
- 
-          // Remove document listeners
-          document.removeEventListener("mousemove", handleDragMove);
-          document.removeEventListener("mouseup", handleDragEnd);
-          document.removeEventListener("touchmove", handleDragMove);
-          document.removeEventListener("touchend", handleDragEnd);
- 
-          if (elements.pagination)
-             elements.pagination.removeEventListener(
-                "click",
-                handlePaginationClick
-             );
-          window.removeEventListener("resize", handleResize);
- 
-          // Clear timeout
-          if (state.resizeTimeout) {
-             clearTimeout(state.resizeTimeout);
-          }
- 
-          // Reset styles
-          if (elements.scroller) {
-             elements.scroller.style.transform = "";
-             elements.scroller.style.transition = "";
-             elements.scroller.style.cursor = "";
-             elements.scroller.style.userSelect = "";
-          }
-       } catch (error) {
-          console.error("Error destroying carousel:", error);
-       }
+        try {
+            // Remove event listeners
+            if (elements.leftArrow)
+                elements.leftArrow.removeEventListener("click", handleLeftClick);
+            if (elements.rightArrow)
+                elements.rightArrow.removeEventListener("click", handleRightClick);
+            if (elements.scroller) {
+                elements.scroller.removeEventListener("mousedown", handleDragStart);
+                elements.scroller.removeEventListener(
+                    "touchstart",
+                    handleDragStart
+                );
+                elements.scroller.removeEventListener(
+                    "contextmenu",
+                    handleDragStart
+                );
+            }
+
+            // Remove document listeners
+            document.removeEventListener("mousemove", handleDragMove);
+            document.removeEventListener("mouseup", handleDragEnd);
+            document.removeEventListener("touchmove", handleDragMove);
+            document.removeEventListener("touchend", handleDragEnd);
+
+            if (elements.pagination)
+                elements.pagination.removeEventListener(
+                    "click",
+                    handlePaginationClick
+                );
+            window.removeEventListener("resize", handleResize);
+
+            // Clear timeout
+            if (state.resizeTimeout) {
+                clearTimeout(state.resizeTimeout);
+            }
+
+            // Reset styles
+            if (elements.scroller) {
+                elements.scroller.style.transform = "";
+                elements.scroller.style.transition = "";
+                elements.scroller.style.cursor = "";
+                elements.scroller.style.userSelect = "";
+            }
+        } catch (error) {
+            console.error("Error destroying carousel:", error);
+        }
     }
- 
+
     // Initialize carousel
     if (!init()) {
-       return null;
+        return null;
     }
- 
+
     // Generate initial pagination
     generatePagination();
- 
+
     // Public API
     return {
-       // Navigation methods
-       next,
-       prev,
-       goToPage,
- 
-       // State getters
-       getCurrentPage: () => state.currentPage,
-       getTotalPages: () => state.totalPages,
-       getConfig: () => ({ ...config }),
-       getState: () => ({ ...state }),
- 
-       // Utility methods
-       refresh,
-       destroy,
- 
-       // Check if carousel can move
-       canGoNext: () => state.currentPage < state.totalPages - 1,
-       canGoPrev: () => state.currentPage > 0,
- 
-       // Get current position info
-       getPosition: () => ({
-          current: state.currentPosition,
-          max: state.maxPosition,
-          percentage:
-             state.maxPosition === 0
-                ? 0
-                : (state.currentPosition / state.maxPosition) * 100
-       })
+        // Navigation methods
+        next,
+        prev,
+        goToPage,
+
+        // State getters
+        getCurrentPage: () => state.currentPage,
+        getTotalPages: () => state.totalPages,
+        getConfig: () => ({ ...config }),
+        getState: () => ({ ...state }),
+
+        // Utility methods
+        refresh,
+        destroy,
+
+        // Check if carousel can move
+        canGoNext: () => state.currentPage < state.totalPages - 1,
+        canGoPrev: () => state.currentPage > 0,
+
+        // Get current position info
+        getPosition: () => ({
+            current: state.currentPosition,
+            max: state.maxPosition,
+            percentage:
+                state.maxPosition === 0
+                    ? 0
+                    : (state.currentPosition / state.maxPosition) * 100
+        })
     };
- }
+}
