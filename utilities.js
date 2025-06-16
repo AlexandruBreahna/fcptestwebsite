@@ -2018,6 +2018,7 @@ function initCarousel(options = {}) {
        showPagination: true,
        mobileBreakpoint: 990,
        animationDuration: 300,
+       startCentered: false,
        ...options
     };
  
@@ -2080,32 +2081,53 @@ function initCarousel(options = {}) {
  
     // Calculate carousel dimensions and positions
     function calculateDimensions() {
-       // Account for wrapper padding (8px) that affects the effective scroll area
-       const wrapperPadding = 8;
-       const wrapperWidth = elements.wrapper.offsetWidth - wrapperPadding * 2;
-       const scrollerWidth = elements.scroller.scrollWidth;
- 
-       // Get computed card width including gap
-       if (elements.productCards.length > 0) {
-          const cardRect = elements.productCards[0].getBoundingClientRect();
-          const cardStyle = getComputedStyle(elements.productCards[0]);
-          const marginRight = parseFloat(cardStyle.marginRight) || 0;
-          state.cardWidth = cardRect.width + marginRight;
-       }
- 
-       // Calculate visible cards based on effective wrapper width
-       state.visibleCards = Math.floor(wrapperWidth / state.cardWidth);
-       if (state.visibleCards === 0) state.visibleCards = 1;
- 
-       // Calculate maximum scroll position accounting for wrapper padding
-       state.maxPosition = Math.max(0, scrollerWidth - wrapperWidth);
- 
-       // Calculate total pages - ensure at least 1 page
-       state.totalPages = Math.ceil(state.totalCards / state.visibleCards);
-       if (state.totalPages === 0) state.totalPages = 1;
- 
-       // Check if desktop view
-       state.isDesktop = window.innerWidth >= config.mobileBreakpoint;
+        // Account for wrapper padding (8px) that affects the effective scroll area
+        const wrapperPadding = 8;
+        const wrapperWidth = elements.wrapper.offsetWidth - (wrapperPadding * 2);
+        const scrollerWidth = elements.scroller.scrollWidth;
+        
+        // Get computed card width including gap
+        if (elements.productCards.length > 0) {
+        const cardRect = elements.productCards[0].getBoundingClientRect();
+        const cardStyle = getComputedStyle(elements.productCards[0]);
+        const marginRight = parseFloat(cardStyle.marginRight) || 0;
+        state.cardWidth = cardRect.width + marginRight;
+        }
+    
+        // Calculate visible cards based on effective wrapper width
+        state.visibleCards = Math.floor(wrapperWidth / state.cardWidth);
+        if (state.visibleCards === 0) state.visibleCards = 1;
+    
+        // Calculate maximum scroll position accounting for wrapper padding
+        state.maxPosition = Math.max(0, scrollerWidth - wrapperWidth);
+        
+        // Calculate total pages - ensure at least 1 page
+        state.totalPages = Math.ceil(state.totalCards / state.visibleCards);
+        if (state.totalPages === 0) state.totalPages = 1;
+    
+        // Check if desktop view
+        state.isDesktop = window.innerWidth >= config.mobileBreakpoint;
+        
+        // Set initial centered position if configured
+        if (config.startCentered) {
+        state.currentPosition = calculateCenteredPosition();
+        }
+    }
+
+    // Calculate centered starting position
+    function calculateCenteredPosition() {
+        if (!config.startCentered) return 0;
+
+        const wrapperPadding = 8;
+        const wrapperWidth = elements.wrapper.offsetWidth - (wrapperPadding * 2);
+        const scrollerWidth = elements.scroller.scrollWidth;
+
+        // Center the content if it's wider than the wrapper
+        if (scrollerWidth > wrapperWidth) {
+            return Math.max(0, (scrollerWidth - wrapperWidth) / 2);
+        }
+
+        return 0;
     }
  
     // Setup event listeners - ensure mobile touch events work properly
@@ -2262,104 +2284,78 @@ function initCarousel(options = {}) {
        state.currentPosition = constrainedPosition;
     }
  
-    // Handle drag end - optimized animation timing for mobile
+    // Handle drag end - conditional snapping based on startCentered config
     function handleDragEnd() {
-       if (!state.isDragging) return;
- 
-       state.isDragging = false;
-       elements.scroller.style.cursor = "";
-       elements.scroller.style.userSelect = "";
- 
-       // Check if we're outside bounds
-       const isLeftOfBounds = state.currentPosition < 0;
-       const isRightOfBounds = state.currentPosition > state.maxPosition;
-       const wasOutOfBounds = isLeftOfBounds || isRightOfBounds;
- 
-       // Get actual card width including gap
-       let actualCardWidth = state.cardWidth;
-       if (elements.productCards.length > 0) {
-          const cardRect = elements.productCards[0].getBoundingClientRect();
-          const scrollerStyle = getComputedStyle(elements.scroller);
-          const gap =
-             parseFloat(scrollerStyle.columnGap) ||
-             parseFloat(scrollerStyle.gap) ||
-             8;
-          actualCardWidth = cardRect.width + gap;
-       }
- 
-       let snapPosition;
- 
-       if (wasOutOfBounds) {
-          // Bounce back to nearest boundary
-          snapPosition = isLeftOfBounds ? 0 : state.maxPosition;
-       } else {
-          // Normal card snapping within bounds
-          const cardIndex = Math.round(state.currentPosition / actualCardWidth);
-          snapPosition = cardIndex * actualCardWidth;
- 
-          // Reduced velocity threshold for more responsive mobile snapping
-          const dragVelocity = state.currentPosition - state.startScrollLeft;
-          const velocityThreshold = state.isDesktop
-             ? actualCardWidth * 0.3
-             : actualCardWidth * 0.2; // Lower threshold on mobile
- 
-          if (Math.abs(dragVelocity) > velocityThreshold) {
-             if (dragVelocity > 0) {
-                snapPosition =
-                   Math.ceil(state.currentPosition / actualCardWidth) *
-                   actualCardWidth;
-             } else {
-                snapPosition =
-                   Math.floor(state.currentPosition / actualCardWidth) *
-                   actualCardWidth;
-             }
-          }
- 
-          // Keep within bounds
-          snapPosition = Math.max(0, Math.min(state.maxPosition, snapPosition));
-       }
- 
-       // Update position with appropriate animation
-       state.currentPosition = snapPosition;
- 
-       // Faster, more responsive animations on mobile
-       const easing = wasOutOfBounds
-          ? "cubic-bezier(0.25, 0.46, 0.45, 0.94)"
-          : "ease-out";
-       const baseDuration = state.isDesktop
-          ? config.animationDuration
-          : config.animationDuration * 0.8; // 20% faster on mobile
-       const duration = wasOutOfBounds ? baseDuration * 1.3 : baseDuration;
- 
-       elements.scroller.style.transition = `transform ${duration}ms ${easing}`;
-       elements.scroller.style.transform = `translateX(-${state.currentPosition}px)`;
- 
-       // Update pagination using constrained position
-       const constrainedPosition = Math.max(
-          0,
-          Math.min(state.maxPosition, state.currentPosition)
-       );
- 
-       if (state.isDesktop) {
-          const pageWidth = actualCardWidth * state.visibleCards;
-          state.currentPage =
-             pageWidth > 0
-                ? Math.min(
-                     Math.floor(constrainedPosition / pageWidth),
-                     state.totalPages - 1
-                  )
-                : 0;
-       } else {
-          state.currentPage =
-             state.maxPosition === 0
-                ? 0
-                : Math.round(
-                     (constrainedPosition / state.maxPosition) *
-                        (state.totalPages - 1)
-                  );
-       }
- 
-       updateUI();
+        if (!state.isDragging) return;
+
+        state.isDragging = false;
+        elements.scroller.style.cursor = '';
+        elements.scroller.style.userSelect = '';
+
+        // Check if we're outside bounds
+        const isLeftOfBounds = state.currentPosition < 0;
+        const isRightOfBounds = state.currentPosition > state.maxPosition;
+        const wasOutOfBounds = isLeftOfBounds || isRightOfBounds;
+
+        let snapPosition;
+
+        if (wasOutOfBounds) {
+            // Always bounce back to boundaries
+            snapPosition = isLeftOfBounds ? 0 : state.maxPosition;
+        } else if (config.startCentered) {
+            // If startCentered is enabled, don't snap to grid - use current position
+            snapPosition = state.currentPosition;
+        } else {
+            // Normal card snapping within bounds
+            let actualCardWidth = state.cardWidth;
+            if (elements.productCards.length > 0) {
+                const cardRect = elements.productCards[0].getBoundingClientRect();
+                const scrollerStyle = getComputedStyle(elements.scroller);
+                const gap = parseFloat(scrollerStyle.columnGap) || parseFloat(scrollerStyle.gap) || 8;
+                actualCardWidth = cardRect.width + gap;
+            }
+
+            const cardIndex = Math.round(state.currentPosition / actualCardWidth);
+            snapPosition = cardIndex * actualCardWidth;
+
+            // Velocity-based snapping for natural feel
+            const dragVelocity = state.currentPosition - state.startScrollLeft;
+            const velocityThreshold = state.isDesktop ? actualCardWidth * 0.3 : actualCardWidth * 0.2;
+
+            if (Math.abs(dragVelocity) > velocityThreshold) {
+                if (dragVelocity > 0) {
+                    snapPosition = Math.ceil(state.currentPosition / actualCardWidth) * actualCardWidth;
+                } else {
+                    snapPosition = Math.floor(state.currentPosition / actualCardWidth) * actualCardWidth;
+                }
+            }
+
+            // Keep within bounds
+            snapPosition = Math.max(0, Math.min(state.maxPosition, snapPosition));
+        }
+
+        // Update position with appropriate animation
+        state.currentPosition = snapPosition;
+
+        // Faster, more responsive animations on mobile
+        const easing = wasOutOfBounds ? 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'ease-out';
+        const baseDuration = state.isDesktop ? config.animationDuration : config.animationDuration * 0.8;
+        const duration = wasOutOfBounds ? baseDuration * 1.3 : baseDuration;
+
+        elements.scroller.style.transition = `transform ${duration}ms ${easing}`;
+        elements.scroller.style.transform = `translateX(-${state.currentPosition}px)`;
+
+        // Update pagination
+        const constrainedPosition = Math.max(0, Math.min(state.maxPosition, state.currentPosition));
+
+        if (state.isDesktop) {
+            const pageWidth = state.cardWidth * state.visibleCards;
+            state.currentPage = pageWidth > 0 ? Math.min(Math.floor(constrainedPosition / pageWidth), state.totalPages - 1) : 0;
+        } else {
+            state.currentPage = state.maxPosition === 0 ? 0 : Math.round((constrainedPosition / state.maxPosition) * (state.totalPages - 1));
+        }
+
+        updateUI();
     }
  
     // Handle pagination click
