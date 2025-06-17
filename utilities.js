@@ -2966,9 +2966,9 @@ function initCarousel(options = {}) {
 function updateVehicleNotification(state, options = {}) {
     // Configuration object with defaults
     const config = {
-        containerId: 'vehicle-selector-notification-box',
-        titleSelector: '.vehicle-selector-notification-title',
-        iconSelector: '.vehicle-selector-notification-icon', // Optional icon element
+        containerId: 'vehicle-selector-compatibility-box',
+        titleSelector: '.vehicle-selector-cb-title',
+        iconSelector: '.vehicle-selector-cb-icon',
         showIcon: true,
         customMessages: {},
         ...options
