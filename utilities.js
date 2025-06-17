@@ -2974,27 +2974,41 @@ function updateVehicleNotification(state, options = {}) {
         ...options
     };
 
-    // State definitions
+    // State definitions with SVG icons
     const states = {
         empty: {
             className: 'is-empty',
             title: 'Enter your vehicle details to see if this product is a fit for your car',
-            icon: '🚗' // Default icon, can be overridden
+            icon: `<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_3433_694362)">
+<path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM12 20C14.1217 20 16.1566 19.1571 17.6569 17.6569C19.1571 16.1566 20 14.1217 20 12C20 9.87827 19.1571 7.84344 17.6569 6.34315C16.1566 4.84285 14.1217 4 12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20ZM11 15H13V17H11V15ZM11 7H13V13H11V7Z" fill="currentColor"/>
+</g>
+</svg>`
         },
         perfect: {
             className: 'is-match',
             title: 'This part will fit your vehicle',
-            icon: '✅'
+            icon: `<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_3433_694362)">
+<path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM11.003 16L18.073 8.929L16.659 7.515L11.003 13.172L8.174 10.343L6.76 11.757L11.003 16Z" fill="currentColor"/>
+</g>
+</svg>`
         },
         partial: {
             className: 'is-partial-match',
             title: 'This part might fit your vehicle, but we need more data',
-            icon: '⚠️'
+            icon: `<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_3433_694362)">
+<path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM12 20C14.1217 20 16.1566 19.1571 17.6569 17.6569C19.1571 16.1566 20 14.1217 20 12C20 9.87827 19.1571 7.84344 17.6569 6.34315C16.1566 4.84285 14.1217 4 12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20ZM11 15H13V17H11V15ZM11 7H13V13H11V7Z" fill="currentColor"/>
+</g>
+</svg>`
         },
         none: {
             className: 'is-not-a-match',
             title: 'This part will not fit your vehicle',
-            icon: '❌'
+            icon: `<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M12.8659 3.00017L22.3922 19.5002C22.6684 19.9785 22.5045 20.5901 22.0262 20.8662C21.8742 20.954 21.7017 21.0002 21.5262 21.0002H2.47363C1.92135 21.0002 1.47363 20.5525 1.47363 20.0002C1.47363 19.8246 1.51984 19.6522 1.60761 19.5002L11.1339 3.00017C11.41 2.52187 12.0216 2.358 12.4999 2.63414C12.6519 2.72191 12.7782 2.84815 12.8659 3.00017ZM10.9999 16.0002V18.0002H12.9999V16.0002H10.9999ZM10.9999 9.00017V14.0002H12.9999V9.00017H10.9999Z" fill="currentColor"/>
+</svg>`
         }
     };
 
@@ -3037,12 +3051,8 @@ function updateVehicleNotification(state, options = {}) {
     if (config.showIcon) {
         const iconElement = container.querySelector(config.iconSelector);
         if (iconElement) {
-            // If it's an img or svg element, update src/content accordingly
-            if (iconElement.tagName.toLowerCase() === 'img') {
-                iconElement.src = currentState.icon; // Assumes icon is a URL when using img
-            } else {
-                iconElement.textContent = currentState.icon; // For text-based icons
-            }
+            // For SVG content, use innerHTML to properly render the SVG
+            iconElement.innerHTML = currentState.icon;
         }
     }
 
