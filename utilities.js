@@ -2962,3 +2962,89 @@ function initCarousel(options = {}) {
         })
     };
 }
+
+function updateVehicleNotification(state, options = {}) {
+    // Configuration object with defaults
+    const config = {
+        containerId: 'vehicle-selector-notification-box',
+        titleSelector: '.vehicle-selector-notification-title',
+        iconSelector: '.vehicle-selector-notification-icon', // Optional icon element
+        showIcon: true,
+        customMessages: {},
+        ...options
+    };
+
+    // State definitions
+    const states = {
+        empty: {
+            className: 'is-empty',
+            title: 'Enter your vehicle details to see if this product is a fit for your car',
+            icon: '🚗' // Default icon, can be overridden
+        },
+        perfect: {
+            className: 'is-match',
+            title: 'This part will fit your vehicle',
+            icon: '✅'
+        },
+        partial: {
+            className: 'is-partial-match',
+            title: 'This part might fit your vehicle, but we need more data',
+            icon: '⚠️'
+        },
+        none: {
+            className: 'is-not-a-match',
+            title: 'This part will not fit your vehicle',
+            icon: '❌'
+        }
+    };
+
+    // Validate state
+    if (!states[state]) {
+        console.error(`Invalid notification state: ${state}. Valid states: ${Object.keys(states).join(', ')}`);
+        return false;
+    }
+
+    // Get DOM elements
+    const container = document.getElementById(config.containerId);
+    if (!container) {
+        console.error(`Container element with ID "${config.containerId}" not found`);
+        return false;
+    }
+
+    const titleElement = container.querySelector(config.titleSelector);
+    if (!titleElement) {
+        console.error(`Title element with selector "${config.titleSelector}" not found`);
+        return false;
+    }
+
+    // Get current state configuration
+    const currentState = states[state];
+
+    // Use custom message if provided
+    const title = config.customMessages[state] || currentState.title;
+
+    // Remove all possible state classes
+    const allClasses = Object.values(states).map(s => s.className);
+    container.classList.remove(...allClasses);
+
+    // Add current state class
+    container.classList.add(currentState.className);
+
+    // Update title
+    titleElement.textContent = title;
+
+    // Handle icon if enabled and element exists
+    if (config.showIcon) {
+        const iconElement = container.querySelector(config.iconSelector);
+        if (iconElement) {
+            // If it's an img or svg element, update src/content accordingly
+            if (iconElement.tagName.toLowerCase() === 'img') {
+                iconElement.src = currentState.icon; // Assumes icon is a URL when using img
+            } else {
+                iconElement.textContent = currentState.icon; // For text-based icons
+            }
+        }
+    }
+
+    return true;
+}
