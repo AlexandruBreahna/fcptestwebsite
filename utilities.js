@@ -1134,7 +1134,14 @@ function initVehicleSelector(config = {}) {
             // Validate configuration if requested
             if (validateData && !isValidVehicleConfiguration(vehicleConfig)) {
                 console.error('Invalid vehicle configuration provided:', vehicleConfig);
-                return false;
+                return {
+                    success: false,
+                    error: 'Invalid vehicle configuration',
+                    values: {},
+                    isComplete: false,
+                    matchType: null,
+                    redirectURL: null
+                };
             }
 
             // Reset to initial state first
@@ -1188,12 +1195,36 @@ function initVehicleSelector(config = {}) {
             }
 
             updateNavigationArrows();
+            // Return detailed information including match type
+            const finalState = { ...selectedValues };
+            const isComplete = fieldNames.every(fieldName => finalState[fieldName]);
+            let matchType = null;
+            let redirectURL = null;
+
+            if (isComplete) {
+                matchType = getVehicleMatchType(finalState);
+                redirectURL = generateRedirectURL(finalState);
+            }
+
             console.log('Vehicle configuration set successfully:', vehicleConfig);
-            return true;
+            return {
+                success: true,
+                values: finalState,
+                isComplete: isComplete,
+                matchType: matchType,
+                redirectURL: redirectURL
+            };
 
         } catch (error) {
             console.error('Error setting vehicle configuration:', error);
-            return false;
+            return {
+                success: false,
+                error: error.message,
+                values: {},
+                isComplete: false,
+                matchType: null,
+                redirectURL: null
+            };
         }
     }
 
