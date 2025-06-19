@@ -3064,6 +3064,7 @@ function initProductImageGallery() {
     let galleryWrapper, thumbnailsList, imagesList, thumbnails, images;
     let mutationObserver;
     let isReinitializing = false;
+    let hasUserInteracted = false;
 
     // Touch/drag tracking variables
     let isDragging = false;
@@ -3190,20 +3191,23 @@ function initProductImageGallery() {
         thumbnails[index].classList.add('selected');
         images[index].classList.add('selected');
 
-        // Set z-index for proper stacking - selected image on top
-        images[index].style.zIndex = '10';
-        images[index].style.transform = 'scale(1)';
-        images[index].style.opacity = '1';
+        // Only apply our custom styling after user interaction or mutation
+        if (hasUserInteracted || isReinitializing) {
+            // Set z-index for proper stacking - selected image on top
+            images[index].style.zIndex = '10';
+            images[index].style.transform = 'scale(1)';
+            images[index].style.opacity = '1';
 
-        // Set other images behind with scale and opacity
-        images.forEach((img, imgIndex) => {
-            if (imgIndex !== index) {
-                img.style.zIndex = '1';
-                img.style.transform = 'scale(0.9)';
-                img.style.opacity = '0';
-                img.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
-            }
-        });
+            // Set other images behind with scale and opacity
+            images.forEach((img, imgIndex) => {
+                if (imgIndex !== index) {
+                    img.style.zIndex = '1';
+                    img.style.transform = 'scale(0.9)';
+                    img.style.opacity = '0';
+                    img.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+                }
+            });
+        }
 
         currentIndex = index;
     };
@@ -3251,6 +3255,7 @@ function initProductImageGallery() {
 
     // Helper function to handle thumbnail click
     const handleThumbnailClick = (index) => {
+        hasUserInteracted = true;
         setSelected(index);
     };
 
@@ -3258,14 +3263,17 @@ function initProductImageGallery() {
     const handleThumbnailKeydown = (event, index) => {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
+            hasUserInteracted = true;
             setSelected(index);
         } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
             event.preventDefault();
+            hasUserInteracted = true;
             const prevIndex = index > 0 ? index - 1 : thumbnails.length - 1;
             thumbnails[prevIndex].focus();
             setSelected(prevIndex);
         } else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
             event.preventDefault();
+            hasUserInteracted = true;
             const nextIndex = index < thumbnails.length - 1 ? index + 1 : 0;
             thumbnails[nextIndex].focus();
             setSelected(nextIndex);
@@ -3279,6 +3287,7 @@ function initProductImageGallery() {
 
     // Handle drag/swipe start
     const handleDragStart = (event) => {
+        hasUserInteracted = true;
         isDragging = true;
         startX = getClientX(event);
         currentX = startX;
@@ -3470,9 +3479,11 @@ function initProductImageGallery() {
             });
         }
 
-        // Initialize event listeners and set selected state
+        // Initialize event listeners but don't force initial styling
         initEventListeners();
-        setSelected(0);
+
+        // Set the current index to 0 but don't apply visual styles yet
+        currentIndex = 0;
     };
 
     // Cleanup function for removing event listeners
