@@ -3070,6 +3070,7 @@ function initProductImageGallery() {
     let currentX = 0;
     let threshold = 50; // Minimum distance for swipe detection
     let currentIndex = 0;
+    let isInitializing = false;
 
     // Helper function to find and cache DOM elements
     const findElements = () => {
@@ -3119,6 +3120,9 @@ function initProductImageGallery() {
     // Function to reinitialize the gallery
     const reinitGallery = () => {
         try {
+            if (isInitializing) return; // Prevent recursive calls
+
+            isInitializing = true;
             console.log('Reinitializing product gallery...');
 
             // Cleanup existing listeners
@@ -3135,13 +3139,16 @@ function initProductImageGallery() {
             } else {
                 console.warn('Product gallery: Elements not found during reinit');
             }
+
+            isInitializing = false;
         } catch (error) {
             console.error('Product gallery reinit error:', error);
+            isInitializing = false;
         }
     };
 
     // Debounced reinit to prevent excessive calls
-    const debouncedReinit = debounce(reinitGallery, 100);
+    const debouncedReinit = debounce(reinitGallery, 500);
 
     // Helper function to clear all selected states
     const clearAllSelected = () => {
@@ -3388,51 +3395,40 @@ function initProductImageGallery() {
         // Set up mutation observer to watch for DOM changes (variant changes)
         if (galleryWrapper && 'MutationObserver' in window) {
             mutationObserver = new MutationObserver((mutations) => {
+                if (isInitializing) return; // Don't react during our own initialization
+
                 let shouldReinit = false;
 
                 mutations.forEach((mutation) => {
-                    // Check if thumbnails or images were added/removed/changed
-                    if (mutation.type === 'childList') {
-                        const hasRelevantChanges = Array.from(mutation.addedNodes).some(node =>
+                    // Only check for significant structural changes
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                        // Check if entire gallery sections were replaced
+                        const hasSignificantChanges = Array.from(mutation.addedNodes).some(node =>
                             node.nodeType === 1 && (
-                                node.matches?.('.product-gallery-thumbnail') ||
-                                node.matches?.('.product-gallery-image') ||
-                                node.querySelector?.('.product-gallery-thumbnail') ||
-                                node.querySelector?.('.product-gallery-image')
-                            )
-                        ) || Array.from(mutation.removedNodes).some(node =>
-                            node.nodeType === 1 && (
-                                node.matches?.('.product-gallery-thumbnail') ||
-                                node.matches?.('.product-gallery-image') ||
-                                node.querySelector?.('.product-gallery-thumbnail') ||
-                                node.querySelector?.('.product-gallery-image')
+                                node.matches?.('.product-gallery-thumbnails-list') ||
+                                node.matches?.('.product-gallery-image-list') ||
+                                node.querySelector?.('.product-gallery-thumbnails-list') ||
+                                node.querySelector?.('.product-gallery-image-list')
                             )
                         );
 
-                        if (hasRelevantChanges) {
+                        if (hasSignificantChanges) {
                             shouldReinit = true;
                         }
-                    }
-
-                    // Check if image src attributes changed
-                    if (mutation.type === 'attributes' &&
-                        mutation.attributeName === 'src' &&
-                        mutation.target.closest('.product-gallery-wrapper')) {
-                        shouldReinit = true;
                     }
                 });
 
                 if (shouldReinit) {
+                    console.log('Significant gallery changes detected, reinitializing...');
                     debouncedReinit();
                 }
             });
 
-            // Start observing
+            // Observe only major structural changes, not styling
             mutationObserver.observe(galleryWrapper, {
                 childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['src']
+                subtree: false, // Don't watch deep changes
+                attributes: false // Don't watch attribute changes
             });
         }
 
