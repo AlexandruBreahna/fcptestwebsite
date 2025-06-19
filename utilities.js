@@ -3063,6 +3063,7 @@ function initProductImageGallery() {
     // Variables that will be updated on reinit
     let galleryWrapper, thumbnailsList, imagesList, thumbnails, images;
     let mutationObserver;
+    let isReinitializing = false;
 
     // Touch/drag tracking variables
     let isDragging = false;
@@ -3070,7 +3071,6 @@ function initProductImageGallery() {
     let currentX = 0;
     let threshold = 50; // Minimum distance for swipe detection
     let currentIndex = 0;
-    let isInitializing = false;
 
     // Helper function to find and cache DOM elements
     const findElements = () => {
@@ -3119,11 +3119,19 @@ function initProductImageGallery() {
 
     // Function to reinitialize the gallery
     const reinitGallery = () => {
-        try {
-            if (isInitializing) return; // Prevent recursive calls
+        if (isReinitializing) {
+            console.log('Reinit already in progress, skipping...');
+            return;
+        }
 
-            isInitializing = true;
+        try {
+            isReinitializing = true;
             console.log('Reinitializing product gallery...');
+
+            // Temporarily disconnect observer to prevent self-triggering
+            if (mutationObserver) {
+                mutationObserver.disconnect();
+            }
 
             // Cleanup existing listeners
             cleanupEventListeners();
@@ -3140,15 +3148,27 @@ function initProductImageGallery() {
                 console.warn('Product gallery: Elements not found during reinit');
             }
 
-            isInitializing = false;
         } catch (error) {
             console.error('Product gallery reinit error:', error);
-            isInitializing = false;
+        } finally {
+            // Reconnect observer and reset flag after a delay
+            setTimeout(() => {
+                if (galleryWrapper && mutationObserver) {
+                    mutationObserver.observe(galleryWrapper, {
+                        childList: true,
+                        subtree: true,
+                        attributes: true,
+                        attributeFilter: ['src'],
+                        attributeOldValue: false
+                    });
+                }
+                isReinitializing = false;
+            }, 1000);
         }
     };
 
     // Debounced reinit to prevent excessive calls
-    const debouncedReinit = debounce(reinitGallery, 500);
+    const debouncedReinit = debounce(reinitGallery, 1000);
 
     // Helper function to clear all selected states
     const clearAllSelected = () => {
@@ -3395,40 +3415,58 @@ function initProductImageGallery() {
         // Set up mutation observer to watch for DOM changes (variant changes)
         if (galleryWrapper && 'MutationObserver' in window) {
             mutationObserver = new MutationObserver((mutations) => {
-                if (isInitializing) return; // Don't react during our own initialization
+                // Don't process mutations if we're currently reinitializing
+                if (isReinitializing) return;
 
                 let shouldReinit = false;
 
                 mutations.forEach((mutation) => {
-                    // Only check for significant structural changes
-                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                        // Check if entire gallery sections were replaced
-                        const hasSignificantChanges = Array.from(mutation.addedNodes).some(node =>
+                    // Only check for significant changes, ignore style/class changes that we make
+                    if (mutation.type === 'childList') {
+                        // Check if actual gallery structure changed (new images added/removed)
+                        const relevantAdditions = Array.from(mutation.addedNodes).some(node =>
                             node.nodeType === 1 && (
-                                node.matches?.('.product-gallery-thumbnails-list') ||
-                                node.matches?.('.product-gallery-image-list') ||
-                                node.querySelector?.('.product-gallery-thumbnails-list') ||
-                                node.querySelector?.('.product-gallery-image-list')
+                                node.matches?.('.product-gallery-thumbnail') ||
+                                node.matches?.('.product-gallery-image')
                             )
                         );
 
-                        if (hasSignificantChanges) {
+                        const relevantRemovals = Array.from(mutation.removedNodes).some(node =>
+                            node.nodeType === 1 && (
+                                node.matches?.('.product-gallery-thumbnail') ||
+                                node.matches?.('.product-gallery-image')
+                            )
+                        );
+
+                        if (relevantAdditions || relevantRemovals) {
+                            console.log('Gallery structure changed - variant switch detected');
                             shouldReinit = true;
                         }
+                    }
+
+                    // Only check for src changes on img elements inside gallery
+                    if (mutation.type === 'attributes' &&
+                        mutation.attributeName === 'src' &&
+                        mutation.target.tagName === 'IMG' &&
+                        (mutation.target.closest('.product-gallery-thumbnail') ||
+                            mutation.target.closest('.product-gallery-image'))) {
+                        console.log('Gallery image src changed - variant switch detected');
+                        shouldReinit = true;
                     }
                 });
 
                 if (shouldReinit) {
-                    console.log('Significant gallery changes detected, reinitializing...');
                     debouncedReinit();
                 }
             });
 
-            // Observe only major structural changes, not styling
+            // Start observing with more specific options
             mutationObserver.observe(galleryWrapper, {
                 childList: true,
-                subtree: false, // Don't watch deep changes
-                attributes: false // Don't watch attribute changes
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['src'], // Only watch src attribute changes
+                attributeOldValue: false
             });
         }
 
