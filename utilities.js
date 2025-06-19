@@ -3058,3 +3058,306 @@ function updateVehicleNotification(state, options = {}) {
 
     return true;
 }
+
+function initProductImageGallery() {
+    // Hoist all variables at the top
+    const galleryWrapper = document.querySelector('#product-image-gallery') || document.querySelector('.product-gallery-wrapper');
+    const thumbnailsList = galleryWrapper?.querySelector('.product-gallery-thumbnails-list');
+    const imagesList = galleryWrapper?.querySelector('.product-gallery-image-list');
+    const thumbnails = thumbnailsList?.querySelectorAll('.product-gallery-thumbnail') || [];
+    const images = imagesList?.querySelectorAll('.product-gallery-image') || [];
+
+    // Touch/drag tracking variables
+    let isDragging = false;
+    let startX = 0;
+    let currentX = 0;
+    let threshold = 50; // Minimum distance for swipe detection
+    let currentIndex = 0;
+
+    // Performance optimization - debounce function
+    const debounce = (func, wait) => {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    };
+
+    // Early exit if required elements don't exist
+    if (!galleryWrapper || !thumbnailsList || !imagesList || thumbnails.length === 0 || images.length === 0) {
+        console.warn('Product gallery: Required elements not found or no images available');
+        return;
+    }
+
+    // Helper function to clear all selected states
+    const clearAllSelected = () => {
+        thumbnails.forEach(thumb => thumb.classList.remove('selected'));
+        images.forEach(img => {
+            img.classList.remove('selected');
+            // Reset all transform and opacity styles
+            img.style.transform = '';
+            img.style.opacity = '';
+            img.style.zIndex = '';
+        });
+    };
+
+    // Helper function to set selected state for specific index
+    const setSelected = (index) => {
+        if (index < 0 || index >= thumbnails.length || index >= images.length) return;
+
+        clearAllSelected();
+        thumbnails[index].classList.add('selected');
+        images[index].classList.add('selected');
+
+        // Set z-index for proper stacking - selected image on top
+        images[index].style.zIndex = '10';
+        images[index].style.transform = 'scale(1)';
+        images[index].style.opacity = '1';
+
+        // Set other images behind with scale and opacity
+        images.forEach((img, imgIndex) => {
+            if (imgIndex !== index) {
+                img.style.zIndex = '1';
+                img.style.transform = 'scale(0.9)';
+                img.style.opacity = '0';
+                img.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+            }
+        });
+
+        currentIndex = index;
+    };
+
+    // Helper function to update drag effect on current and next images
+    const updateDragEffect = (deltaX) => {
+        const currentImage = images[currentIndex];
+        if (!currentImage) return;
+
+        const dragRatio = Math.abs(deltaX) / threshold;
+        const clampedRatio = Math.min(dragRatio, 1);
+
+        // Current image: slides and fades out completely
+        currentImage.style.opacity = 1 - clampedRatio; // Fade out completely (1 → 0)
+        currentImage.style.transform = `translateX(${deltaX}px)`; // Just slide, no scaling
+        currentImage.style.transition = 'none'; // Disable transition during drag
+
+        // Determine next image based on drag direction
+        let nextIndex = -1;
+        if (deltaX < 0 && currentIndex < images.length - 1) {
+            nextIndex = currentIndex + 1; // Dragging left, show next image
+        } else if (deltaX > 0 && currentIndex > 0) {
+            nextIndex = currentIndex - 1; // Dragging right, show previous image
+        }
+
+        // Animate the next image coming in: scale from 0.9 to 1 and fade in
+        if (nextIndex >= 0 && images[nextIndex]) {
+            const nextImage = images[nextIndex];
+            const nextOpacity = clampedRatio; // Fade in (0 → 1)
+            const nextScale = 0.9 + clampedRatio * 0.1; // Scale from 0.9 to 1
+
+            nextImage.style.opacity = nextOpacity;
+            nextImage.style.transform = `scale(${nextScale})`;
+            nextImage.style.zIndex = '5'; // Between background and current
+            nextImage.style.transition = 'none'; // Disable transition during drag
+        }
+    };
+
+    // Helper function to reset drag effects
+    const resetDragEffects = () => {
+        images.forEach(img => {
+            img.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+        });
+    };
+
+    // Helper function to handle thumbnail click
+    const handleThumbnailClick = (index) => {
+        setSelected(index);
+    };
+
+    // Helper function to handle keyboard navigation
+    const handleThumbnailKeydown = (event, index) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            setSelected(index);
+        } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+            event.preventDefault();
+            const prevIndex = index > 0 ? index - 1 : thumbnails.length - 1;
+            thumbnails[prevIndex].focus();
+            setSelected(prevIndex);
+        } else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const nextIndex = index < thumbnails.length - 1 ? index + 1 : 0;
+            thumbnails[nextIndex].focus();
+            setSelected(nextIndex);
+        }
+    };
+
+    // Helper function to get touch/mouse X coordinate
+    const getClientX = (event) => {
+        return event.type.includes('touch') ? event.touches[0]?.clientX || event.changedTouches[0]?.clientX : event.clientX;
+    };
+
+    // Handle drag/swipe start
+    const handleDragStart = (event) => {
+        isDragging = true;
+        startX = getClientX(event);
+        currentX = startX;
+
+        // Change cursor to grabbing and add grab styles
+        if (imagesList) {
+            imagesList.style.cursor = 'grabbing';
+            imagesList.style.userSelect = 'none';
+        }
+
+        // Prevent default drag behavior for images
+        event.preventDefault();
+    };
+
+    // Handle drag/swipe move
+    const handleDragMove = (event) => {
+        if (!isDragging) return;
+
+        currentX = getClientX(event);
+        const deltaX = currentX - startX;
+
+        // Add resistance at boundaries
+        let resistedDelta = deltaX;
+        if ((currentIndex === 0 && deltaX > 0) || (currentIndex === images.length - 1 && deltaX < 0)) {
+            resistedDelta = deltaX * 0.3; // Reduced movement at boundaries
+        }
+
+        updateDragEffect(resistedDelta);
+
+        event.preventDefault();
+    };
+
+    // Handle drag/swipe end
+    const handleDragEnd = (event) => {
+        if (!isDragging) return;
+
+        isDragging = false;
+        const deltaX = currentX - startX;
+
+        // Restore cursor and styles
+        if (imagesList) {
+            imagesList.style.cursor = 'grab';
+            imagesList.style.userSelect = '';
+        }
+
+        resetDragEffects();
+
+        // Check if swipe meets threshold
+        if (Math.abs(deltaX) > threshold) {
+            if (deltaX > 0 && currentIndex > 0) {
+                // Swipe right - go to previous image
+                setSelected(currentIndex - 1);
+            } else if (deltaX < 0 && currentIndex < images.length - 1) {
+                // Swipe left - go to next image
+                setSelected(currentIndex + 1);
+            } else {
+                // At boundary, reset to current state
+                setSelected(currentIndex);
+            }
+        } else {
+            // Swipe didn't meet threshold, reset to current state
+            setSelected(currentIndex);
+        }
+
+        // Reset tracking variables
+        startX = 0;
+        currentX = 0;
+    };
+
+    // Debounced resize handler for performance
+    const handleResize = debounce(() => {
+        // Could add responsive logic here if needed
+    }, 250);
+
+    // Initialize gallery state
+    const init = () => {
+        try {
+            // Set initial selected state (first items)
+            setSelected(0);
+
+            // Add click event listeners to thumbnails
+            thumbnails.forEach((thumbnail, index) => {
+                // Make thumbnails focusable
+                thumbnail.setAttribute('tabindex', '0');
+                thumbnail.setAttribute('role', 'button');
+                thumbnail.setAttribute('aria-label', `View image ${index + 1} of ${thumbnails.length}`);
+
+                // Add click handler
+                thumbnail.addEventListener('click', () => handleThumbnailClick(index));
+
+                // Add keyboard handler
+                thumbnail.addEventListener('keydown', (event) => handleThumbnailKeydown(event, index));
+            });
+
+            // Add touch/drag event listeners to images container
+            if (imagesList) {
+                // Set initial cursor style
+                imagesList.style.cursor = 'grab';
+
+                // Touch events for mobile
+                imagesList.addEventListener('touchstart', handleDragStart, { passive: false });
+                imagesList.addEventListener('touchmove', handleDragMove, { passive: false });
+                imagesList.addEventListener('touchend', handleDragEnd, { passive: false });
+
+                // Mouse events for desktop
+                imagesList.addEventListener('mousedown', handleDragStart);
+                imagesList.addEventListener('mousemove', handleDragMove);
+                imagesList.addEventListener('mouseup', handleDragEnd);
+                imagesList.addEventListener('mouseleave', handleDragEnd); // Handle mouse leaving area
+
+                // Prevent context menu on long press
+                imagesList.addEventListener('contextmenu', (e) => e.preventDefault());
+
+                // Prevent image dragging
+                const imageElements = imagesList.querySelectorAll('img');
+                imageElements.forEach(img => {
+                    img.addEventListener('dragstart', (e) => e.preventDefault());
+                });
+            }
+
+            // Add resize listener for responsive behavior
+            window.addEventListener('resize', handleResize);
+
+        } catch (error) {
+            console.error('Product gallery initialization error:', error);
+        }
+    };
+
+    // Cleanup function for removing event listeners
+    const destroy = () => {
+        try {
+            thumbnails.forEach((thumbnail, index) => {
+                thumbnail.removeEventListener('click', () => handleThumbnailClick(index));
+                thumbnail.removeEventListener('keydown', (event) => handleThumbnailKeydown(event, index));
+            });
+
+            if (imagesList) {
+                imagesList.removeEventListener('touchstart', handleDragStart);
+                imagesList.removeEventListener('touchmove', handleDragMove);
+                imagesList.removeEventListener('touchend', handleDragEnd);
+                imagesList.removeEventListener('mousedown', handleDragStart);
+                imagesList.removeEventListener('mousemove', handleDragMove);
+                imagesList.removeEventListener('mouseup', handleDragEnd);
+                imagesList.removeEventListener('mouseleave', handleDragEnd);
+                imagesList.removeEventListener('contextmenu', (e) => e.preventDefault());
+            }
+
+            window.removeEventListener('resize', handleResize);
+        } catch (error) {
+            console.error('Product gallery cleanup error:', error);
+        }
+    };
+
+    // Initialize the gallery
+    init();
+
+    // Return destroy function for cleanup if needed
+    return { destroy };
+}
