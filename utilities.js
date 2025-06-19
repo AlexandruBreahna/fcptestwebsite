@@ -3060,12 +3060,9 @@ function updateVehicleNotification(state, options = {}) {
 }
 
 function initProductImageGallery() {
-    // Hoist all variables at the top
-    const galleryWrapper = document.querySelector('#product-image-gallery') || document.querySelector('.product-gallery-wrapper');
-    const thumbnailsList = galleryWrapper?.querySelector('.product-gallery-thumbnails-list');
-    const imagesList = galleryWrapper?.querySelector('.product-gallery-image-list');
-    const thumbnails = thumbnailsList?.querySelectorAll('.product-gallery-thumbnail') || [];
-    const images = imagesList?.querySelectorAll('.product-gallery-image') || [];
+    // Variables that will be updated on reinit
+    let galleryWrapper, thumbnailsList, imagesList, thumbnails, images;
+    let mutationObserver;
 
     // Touch/drag tracking variables
     let isDragging = false;
@@ -3073,6 +3070,17 @@ function initProductImageGallery() {
     let currentX = 0;
     let threshold = 50; // Minimum distance for swipe detection
     let currentIndex = 0;
+
+    // Helper function to find and cache DOM elements
+    const findElements = () => {
+        galleryWrapper = document.querySelector('#product-image-gallery') || document.querySelector('.product-gallery-wrapper');
+        thumbnailsList = galleryWrapper?.querySelector('.product-gallery-thumbnails-list');
+        imagesList = galleryWrapper?.querySelector('.product-gallery-image-list');
+        thumbnails = Array.from(thumbnailsList?.querySelectorAll('.product-gallery-thumbnail') || []);
+        images = Array.from(imagesList?.querySelectorAll('.product-gallery-image') || []);
+
+        return galleryWrapper && thumbnailsList && imagesList && thumbnails.length > 0 && images.length > 0;
+    };
 
     // Performance optimization - debounce function
     const debounce = (func, wait) => {
@@ -3087,11 +3095,53 @@ function initProductImageGallery() {
         };
     };
 
-    // Early exit if required elements don't exist
-    if (!galleryWrapper || !thumbnailsList || !imagesList || thumbnails.length === 0 || images.length === 0) {
-        console.warn('Product gallery: Required elements not found or no images available');
-        return;
-    }
+    // Cleanup function for removing event listeners
+    const cleanupEventListeners = () => {
+        try {
+            if (thumbnails && thumbnails.length > 0) {
+                thumbnails.forEach((thumbnail, index) => {
+                    const newThumbnail = thumbnail.cloneNode(true);
+                    thumbnail.parentNode?.replaceChild(newThumbnail, thumbnail);
+                });
+            }
+
+            if (imagesList) {
+                const newImagesList = imagesList.cloneNode(true);
+                imagesList.parentNode?.replaceChild(newImagesList, imagesList);
+            }
+
+            window.removeEventListener('resize', handleResize);
+        } catch (error) {
+            console.error('Product gallery cleanup error:', error);
+        }
+    };
+
+    // Function to reinitialize the gallery
+    const reinitGallery = () => {
+        try {
+            console.log('Reinitializing product gallery...');
+
+            // Cleanup existing listeners
+            cleanupEventListeners();
+
+            // Reset current index
+            currentIndex = 0;
+
+            // Find elements again
+            if (findElements()) {
+                initEventListeners();
+                setSelected(0);
+                console.log('Product gallery reinitialized successfully');
+            } else {
+                console.warn('Product gallery: Elements not found during reinit');
+            }
+        } catch (error) {
+            console.error('Product gallery reinit error:', error);
+        }
+    };
+
+    // Debounced reinit to prevent excessive calls
+    const debouncedReinit = debounce(reinitGallery, 100);
 
     // Helper function to clear all selected states
     const clearAllSelected = () => {
@@ -3277,11 +3327,8 @@ function initProductImageGallery() {
     }, 250);
 
     // Initialize gallery state
-    const init = () => {
+    const initEventListeners = () => {
         try {
-            // Set initial selected state (first items)
-            setSelected(0);
-
             // Add click event listeners to thumbnails
             thumbnails.forEach((thumbnail, index) => {
                 // Make thumbnails focusable
@@ -3330,26 +3377,80 @@ function initProductImageGallery() {
         }
     };
 
+    // Initialize gallery
+    const init = () => {
+        // Find elements
+        if (!findElements()) {
+            console.warn('Product gallery: Required elements not found or no images available');
+            return;
+        }
+
+        // Set up mutation observer to watch for DOM changes (variant changes)
+        if (galleryWrapper && 'MutationObserver' in window) {
+            mutationObserver = new MutationObserver((mutations) => {
+                let shouldReinit = false;
+
+                mutations.forEach((mutation) => {
+                    // Check if thumbnails or images were added/removed/changed
+                    if (mutation.type === 'childList') {
+                        const hasRelevantChanges = Array.from(mutation.addedNodes).some(node =>
+                            node.nodeType === 1 && (
+                                node.matches?.('.product-gallery-thumbnail') ||
+                                node.matches?.('.product-gallery-image') ||
+                                node.querySelector?.('.product-gallery-thumbnail') ||
+                                node.querySelector?.('.product-gallery-image')
+                            )
+                        ) || Array.from(mutation.removedNodes).some(node =>
+                            node.nodeType === 1 && (
+                                node.matches?.('.product-gallery-thumbnail') ||
+                                node.matches?.('.product-gallery-image') ||
+                                node.querySelector?.('.product-gallery-thumbnail') ||
+                                node.querySelector?.('.product-gallery-image')
+                            )
+                        );
+
+                        if (hasRelevantChanges) {
+                            shouldReinit = true;
+                        }
+                    }
+
+                    // Check if image src attributes changed
+                    if (mutation.type === 'attributes' &&
+                        mutation.attributeName === 'src' &&
+                        mutation.target.closest('.product-gallery-wrapper')) {
+                        shouldReinit = true;
+                    }
+                });
+
+                if (shouldReinit) {
+                    debouncedReinit();
+                }
+            });
+
+            // Start observing
+            mutationObserver.observe(galleryWrapper, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['src']
+            });
+        }
+
+        // Initialize event listeners and set selected state
+        initEventListeners();
+        setSelected(0);
+    };
+
     // Cleanup function for removing event listeners
     const destroy = () => {
         try {
-            thumbnails.forEach((thumbnail, index) => {
-                thumbnail.removeEventListener('click', () => handleThumbnailClick(index));
-                thumbnail.removeEventListener('keydown', (event) => handleThumbnailKeydown(event, index));
-            });
-
-            if (imagesList) {
-                imagesList.removeEventListener('touchstart', handleDragStart);
-                imagesList.removeEventListener('touchmove', handleDragMove);
-                imagesList.removeEventListener('touchend', handleDragEnd);
-                imagesList.removeEventListener('mousedown', handleDragStart);
-                imagesList.removeEventListener('mousemove', handleDragMove);
-                imagesList.removeEventListener('mouseup', handleDragEnd);
-                imagesList.removeEventListener('mouseleave', handleDragEnd);
-                imagesList.removeEventListener('contextmenu', (e) => e.preventDefault());
+            // Disconnect mutation observer
+            if (mutationObserver) {
+                mutationObserver.disconnect();
+                mutationObserver = null;
             }
 
-            window.removeEventListener('resize', handleResize);
+            cleanupEventListeners();
         } catch (error) {
             console.error('Product gallery cleanup error:', error);
         }
