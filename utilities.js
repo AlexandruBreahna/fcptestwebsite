@@ -3188,6 +3188,8 @@ function initProductImageGallery() {
         if (index < 0 || index >= thumbnails.length || index >= images.length) return;
 
         clearAllSelected();
+
+        // Always apply the selected class - this is basic functionality
         thumbnails[index].classList.add('selected');
         images[index].classList.add('selected');
 
@@ -3479,11 +3481,11 @@ function initProductImageGallery() {
             });
         }
 
-        // Initialize event listeners but don't force initial styling
+        // Initialize event listeners
         initEventListeners();
 
-        // Set the current index to 0 but don't apply visual styles yet
-        currentIndex = 0;
+        // Always set the initial selected state (basic functionality)
+        setSelected(0);
     };
 
     // Cleanup function for removing event listeners
