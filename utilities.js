@@ -3164,12 +3164,12 @@ function initProductImageGallery() {
                     });
                 }
                 isReinitializing = false;
-            }, 1000);
+            }, 300);
         }
     };
 
     // Debounced reinit to prevent excessive calls
-    const debouncedReinit = debounce(reinitGallery, 1000);
+    const debouncedReinit = debounce(reinitGallery, 300);
 
     // Helper function to clear all selected states
     const clearAllSelected = () => {
