@@ -3509,3 +3509,632 @@ function initProductImageGallery() {
     // Return destroy function for cleanup if needed
     return { destroy };
 }
+
+function initVehicleGarageModal(config = {}) {
+    // Hoist all variables at the top
+    const STORAGE_KEY = 'vehicleGarage';
+    const MAX_VEHICLES = 3;
+    let garageData = [];
+    
+    // Configuration with defaults
+    const settings = {
+      modalId: config.modalId || 'vehicle-garage-modal',
+      triggerSelector: config.triggerSelector || '#currently-selected-vehicle',
+      jewelId: config.jewelId || 'garage-items',
+      onVehicleSelected: config.onVehicleSelected || null,
+      onVehicleRemoved: config.onVehicleRemoved || null,
+      onAddNewVehicle: config.onAddNewVehicle || null,
+      onModalOpen: config.onModalOpen || null,
+      onModalClose: config.onModalClose || null,
+      maxVehiclesMessage: config.maxVehiclesMessage || `You can only save up to ${MAX_VEHICLES} vehicles in your garage. Please create an account to save more vehicles.`,
+      ...config
+    };
+    
+    // DOM elements
+    const modal = document.getElementById(settings.modalId);
+    const trigger = document.querySelector(settings.triggerSelector);
+    const vehicleGarageUl = modal?.querySelector('.vehicle-garage');
+    const jewelIndicator = document.getElementById(settings.jewelId);
+    const addNewVehicleBtn = modal?.querySelector('.dropdown-link');
+    const emptyState = modal?.querySelector('.vehicle-garage-empty-state');
+    const modalBackdrop = modal?.querySelector('.modal-backdrop');
+    const modalClose = modal?.querySelector('.modal-close, .close-button');
+    
+    // Check required elements
+    if (!modal) {
+      console.error(`Vehicle garage modal: Modal element with ID "${settings.modalId}" not found`);
+      return null;
+    }
+    
+    if (!trigger) {
+      console.error(`Vehicle garage modal: Trigger element "${settings.triggerSelector}" not found`);
+      return null;
+    }
+    
+    // Initialize the modal system
+    function init() {
+      try {
+        // Load garage data from localStorage
+        loadGarageData();
+        
+        // Set up event listeners
+        setupEventListeners();
+        
+        // Initial render
+        renderGarage();
+        
+        console.log('Vehicle garage modal initialized successfully');
+      } catch (error) {
+        console.error('Error initializing vehicle garage modal:', error);
+      }
+    }
+    
+    // Load garage data from localStorage
+    function loadGarageData() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        garageData = stored ? JSON.parse(stored) : [];
+        
+        // Validate data structure
+        if (!Array.isArray(garageData)) {
+          garageData = [];
+        }
+        
+        // Ensure each vehicle has required properties
+        garageData = garageData.filter(vehicle => 
+          vehicle && 
+          typeof vehicle === 'object' && 
+          vehicle.year && 
+          vehicle.make && 
+          vehicle.model
+        );
+        
+      } catch (error) {
+        console.error('Error loading garage data:', error);
+        garageData = [];
+      }
+    }
+    
+    // Save garage data to localStorage
+    function saveGarageData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(garageData));
+      } catch (error) {
+        console.error('Error saving garage data:', error);
+      }
+    }
+    
+    // Set up event listeners
+    function setupEventListeners() {
+      // Trigger to open modal
+      if (trigger) {
+        trigger.addEventListener('click', handleTriggerClick);
+        trigger.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleTriggerClick(e);
+          }
+        });
+      }
+      
+      // Modal close events
+      if (modalBackdrop) {
+        modalBackdrop.addEventListener('click', closeModal);
+      }
+      
+      if (modalClose) {
+        modalClose.addEventListener('click', closeModal);
+      }
+      
+      // ESC key to close modal
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isModalOpen()) {
+          closeModal();
+        }
+      });
+      
+      // Garage interactions
+      if (vehicleGarageUl) {
+        vehicleGarageUl.addEventListener('click', handleGarageClick);
+        vehicleGarageUl.addEventListener('keydown', handleGarageKeydown);
+      }
+      
+      // Add new vehicle button
+      if (addNewVehicleBtn) {
+        addNewVehicleBtn.addEventListener('click', handleAddNewVehicle);
+        addNewVehicleBtn.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleAddNewVehicle(e);
+          }
+        });
+      }
+      
+      // Listen for localStorage changes from other garage instances
+      window.addEventListener('storage', handleStorageChange);
+    }
+    
+    // Handle trigger click to open modal
+    function handleTriggerClick(e) {
+      e.preventDefault();
+      openModal();
+    }
+    
+    // Open modal
+    function openModal() {
+      try {
+        // Refresh data in case it changed
+        loadGarageData();
+        renderGarage();
+        
+        // Show modal
+        modal.style.display = 'block';
+        
+        // Focus management
+        const firstFocusable = modal.querySelector('a, button, [tabindex]:not([tabindex="-1"])');
+        if (firstFocusable) {
+          firstFocusable.focus();
+        }
+        
+        // Trigger callback
+        if (typeof settings.onModalOpen === 'function') {
+          settings.onModalOpen();
+        }
+        
+        console.log('Garage modal opened');
+      } catch (error) {
+        console.error('Error opening garage modal:', error);
+      }
+    }
+    
+    // Close modal
+    function closeModal() {
+      try {
+        modal.style.display = 'none';
+        
+        // Return focus to trigger
+        if (trigger) {
+          trigger.focus();
+        }
+        
+        // Trigger callback
+        if (typeof settings.onModalClose === 'function') {
+          settings.onModalClose();
+        }
+        
+        console.log('Garage modal closed');
+      } catch (error) {
+        console.error('Error closing garage modal:', error);
+      }
+    }
+    
+    // Check if modal is open
+    function isModalOpen() {
+      return modal && modal.style.display !== 'none';
+    }
+    
+    // Handle storage changes from other instances
+    function handleStorageChange(e) {
+      if (e.key === STORAGE_KEY && isModalOpen()) {
+        loadGarageData();
+        renderGarage();
+      }
+    }
+    
+    // Handle clicks within the garage list
+    function handleGarageClick(e) {
+      e.preventDefault();
+      
+      const target = e.target.closest('a');
+      if (!target) return;
+      
+      // Handle vehicle selection
+      if (target.classList.contains('vehicle-garage-entry-details')) {
+        const vehicleEntry = target.closest('.vehicle-garage-entry');
+        const vehicleId = vehicleEntry?.dataset.vehicleId;
+        
+        if (vehicleId) {
+          selectVehicle(vehicleId);
+        }
+      }
+      
+      // Handle vehicle removal
+      else if (target.classList.contains('remove-button')) {
+        const vehicleEntry = target.closest('.vehicle-garage-entry');
+        const vehicleId = vehicleEntry?.dataset.vehicleId;
+        
+        if (vehicleId) {
+          removeVehicle(vehicleId);
+        }
+      }
+    }
+    
+    // Handle keyboard navigation
+    function handleGarageKeydown(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleGarageClick(e);
+      }
+    }
+    
+    // Handle adding new vehicle
+    function handleAddNewVehicle(e) {
+      e.preventDefault();
+      
+      try {
+        // Deselect any currently selected vehicle
+        deselectAllVehicles();
+        renderGarage();
+        
+        // Close modal
+        closeModal();
+        
+        // Trigger callback if provided
+        if (typeof settings.onAddNewVehicle === 'function') {
+          settings.onAddNewVehicle();
+        }
+        
+        console.log('Add new vehicle triggered from modal');
+      } catch (error) {
+        console.error('Error handling add new vehicle:', error);
+      }
+    }
+    
+    // Add vehicle to garage
+    function addVehicleToGarage(vehicleConfig) {
+      try {
+        // Check if garage is full
+        if (garageData.length >= MAX_VEHICLES) {
+          showMaxVehiclesMessage();
+          return false;
+        }
+        
+        // Validate required fields
+        if (!vehicleConfig || !vehicleConfig.year || !vehicleConfig.make || !vehicleConfig.model) {
+          console.warn('Invalid vehicle configuration provided');
+          return false;
+        }
+        
+        // Create vehicle object with unique ID
+        const vehicleId = generateVehicleId(vehicleConfig);
+        const vehicle = {
+          id: vehicleId,
+          ...vehicleConfig,
+          dateAdded: Date.now(),
+          selected: true // New vehicle is automatically selected
+        };
+        
+        // Remove any existing selection
+        garageData.forEach(v => v.selected = false);
+        
+        // Check if vehicle already exists
+        const existingIndex = garageData.findIndex(v => v.id === vehicleId);
+        
+        if (existingIndex >= 0) {
+          // Update existing vehicle and move to end
+          garageData.splice(existingIndex, 1);
+          garageData.push(vehicle);
+        } else {
+          // Add new vehicle to end
+          garageData.push(vehicle);
+        }
+        
+        // Save and render
+        saveGarageData();
+        renderGarage();
+        updateJewelIndicator();
+        
+        console.log('Vehicle added to garage from modal:', vehicle);
+        return true;
+      } catch (error) {
+        console.error('Error adding vehicle to garage:', error);
+        return false;
+      }
+    }
+    
+    // Generate unique vehicle ID
+    function generateVehicleId(vehicleConfig) {
+      const parts = [
+        vehicleConfig.year,
+        vehicleConfig.make,
+        vehicleConfig.model,
+        vehicleConfig.submodel || '',
+        vehicleConfig.chassis || '',
+        vehicleConfig.engine || '',
+        vehicleConfig.transmission || ''
+      ];
+      
+      return parts
+        .filter(part => part && part !== 'I don\'t know')
+        .join('-')
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+    
+    // Select a vehicle (or deselect if already selected)
+    function selectVehicle(vehicleId) {
+      try {
+        // Find the vehicle
+        const vehicle = garageData.find(v => v.id === vehicleId);
+        if (!vehicle) return false;
+        
+        // Check if this vehicle is already selected
+        const isAlreadySelected = vehicle.selected;
+        
+        if (isAlreadySelected) {
+          // Deselect the vehicle if it's already selected
+          garageData.forEach(v => v.selected = false);
+          
+          // Save changes
+          saveGarageData();
+          
+          // Update UI
+          renderGarage();
+          updateJewelIndicator();
+          
+          // Trigger removal callback to reset vehicle selector
+          if (typeof settings.onVehicleRemoved === 'function') {
+            settings.onVehicleRemoved(vehicle, true);
+          }
+          
+          console.log('Vehicle deselected from modal:', vehicleId);
+          return true;
+        } else {
+          // Select the vehicle (deselect others)
+          garageData.forEach(v => {
+            v.selected = v.id === vehicleId;
+          });
+          
+          // Save changes
+          saveGarageData();
+          
+          // Update UI
+          renderGarage();
+          updateJewelIndicator();
+          
+          // Trigger callback if provided
+          if (typeof settings.onVehicleSelected === 'function') {
+            settings.onVehicleSelected(vehicle);
+          }
+          
+          console.log('Vehicle selected from modal:', vehicleId);
+          return true;
+        }
+      } catch (error) {
+        console.error('Error selecting vehicle from modal:', error);
+        return false;
+      }
+    }
+    
+    // Remove a vehicle from garage and clear selection
+    function removeVehicle(vehicleId) {
+      try {
+        const vehicleIndex = garageData.findIndex(v => v.id === vehicleId);
+        
+        if (vehicleIndex === -1) return false;
+        
+        const wasSelected = garageData[vehicleIndex].selected;
+        const removedVehicle = garageData[vehicleIndex];
+        
+        // Remove vehicle
+        garageData.splice(vehicleIndex, 1);
+        
+        // Clear all selections
+        garageData.forEach(v => v.selected = false);
+        
+        // Save and render
+        saveGarageData();
+        renderGarage();
+        updateJewelIndicator();
+        
+        // Trigger callback if provided
+        if (typeof settings.onVehicleRemoved === 'function') {
+          settings.onVehicleRemoved(removedVehicle, true);
+        }
+        
+        console.log('Vehicle removed from modal and selection cleared:', vehicleId);
+        return true;
+      } catch (error) {
+        console.error('Error removing vehicle from modal:', error);
+        return false;
+      }
+    }
+    
+    // Deselect all vehicles
+    function deselectAllVehicles() {
+      const hadSelection = garageData.some(v => v.selected);
+      garageData.forEach(vehicle => vehicle.selected = false);
+      saveGarageData();
+      return hadSelection;
+    }
+    
+    // Render the garage UI
+    function renderGarage() {
+      try {
+        if (!vehicleGarageUl) return;
+        
+        // Clear existing vehicle entries (keep empty state)
+        const existingEntries = vehicleGarageUl.querySelectorAll('.vehicle-garage-entry');
+        existingEntries.forEach(entry => entry.remove());
+        
+        if (garageData.length === 0) {
+          // Show empty state
+          if (emptyState) {
+            emptyState.style.display = 'block';
+          }
+        } else {
+          // Hide empty state
+          if (emptyState) {
+            emptyState.style.display = 'none';
+          }
+          
+          // Render vehicles (in reverse order - newest first)
+          const sortedVehicles = [...garageData].reverse();
+          
+          sortedVehicles.forEach(vehicle => {
+            const vehicleElement = createVehicleElement(vehicle);
+            
+            // Insert before empty state if it exists
+            if (emptyState) {
+              vehicleGarageUl.insertBefore(vehicleElement, emptyState);
+            } else {
+              vehicleGarageUl.appendChild(vehicleElement);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error rendering garage in modal:', error);
+      }
+    }
+    
+    // Create vehicle element
+    function createVehicleElement(vehicle) {
+      const li = document.createElement('li');
+      li.className = `vehicle-garage-entry${vehicle.selected ? ' selected' : ''}`;
+      li.dataset.vehicleId = vehicle.id;
+      
+      // Generate vehicle title and subtitle
+      const title = generateVehicleTitle(vehicle);
+      const subtitle = generateVehicleSubtitle(vehicle);
+      
+      li.innerHTML = `
+        <a href="#" class="vehicle-garage-entry-details" tabindex="0">
+          <div class="fake-radio-button"></div>
+          <div class="flex-block-34">
+            <div class="vehicle-entry-title">${escapeHtml(title)}</div>
+            <div class="vehicle-entry-subtitle">${escapeHtml(subtitle)}</div>
+          </div>
+        </a>
+        <div class="vehicle-garage-entry-actions">
+          <a href="#" class="remove-button" tabindex="0">
+            <div>Remove</div>
+          </a>
+        </div>
+      `;
+      
+      return li;
+    }
+    
+    // Generate vehicle title
+    function generateVehicleTitle(vehicle) {
+      const parts = [vehicle.year, vehicle.make, vehicle.model];
+      return parts.filter(Boolean).join(' ');
+    }
+    
+    // Generate vehicle subtitle
+    function generateVehicleSubtitle(vehicle) {
+      const parts = [
+        vehicle.submodel,
+        vehicle.chassis,
+        vehicle.engine,
+        vehicle.transmission
+      ].filter(part => part && part !== 'I don\'t know');
+      
+      return parts.join(', ') || 'Standard Configuration';
+    }
+    
+    // Update jewel indicator (shared with main garage)
+    function updateJewelIndicator() {
+      if (!jewelIndicator) return;
+      
+      const count = garageData.length;
+      const wasVisible = jewelIndicator.style.display !== 'none';
+      
+      if (count >= 1) {
+        jewelIndicator.textContent = count.toString();
+        jewelIndicator.style.display = 'block';
+        
+        // Add pop animation effect when jewel becomes visible or count changes
+        if (!wasVisible || parseInt(jewelIndicator.textContent) !== count) {
+          animateJewelPop();
+        }
+      } else {
+        jewelIndicator.style.display = 'none';
+      }
+    }
+    
+    // Animate jewel pop effect using JavaScript transitions
+    function animateJewelPop() {
+      if (!jewelIndicator) return;
+      
+      // Store original transform
+      const originalTransform = jewelIndicator.style.transform || '';
+      
+      // Apply pop effect: scale up then back to normal
+      jewelIndicator.style.transition = 'transform 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+      jewelIndicator.style.transform = 'scale(1.3)';
+      
+      // Reset to normal size after animation
+      setTimeout(() => {
+        if (jewelIndicator) {
+          jewelIndicator.style.transform = originalTransform;
+          
+          // Clean up transition after animation completes
+          setTimeout(() => {
+            if (jewelIndicator) {
+              jewelIndicator.style.transition = '';
+            }
+          }, 200);
+        }
+      }, 150);
+    }
+    
+    // Show max vehicles message
+    function showMaxVehiclesMessage() {
+      alert(settings.maxVehiclesMessage);
+    }
+    
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Public API
+    const api = {
+      // Modal controls
+      open: openModal,
+      close: closeModal,
+      isOpen: isModalOpen,
+      
+      // Vehicle management
+      addVehicle: addVehicleToGarage,
+      removeVehicle: removeVehicle,
+      selectVehicle: selectVehicle,
+      
+      // Data access
+      getGarageData: () => [...garageData],
+      getSelectedVehicle: () => garageData.find(v => v.selected) || null,
+      
+      // Utility
+      refresh: () => {
+        loadGarageData();
+        renderGarage();
+        updateJewelIndicator();
+      },
+      
+      // Deselect all vehicles
+      deselectAll: () => {
+        const hadSelection = deselectAllVehicles();
+        renderGarage();
+        updateJewelIndicator();
+        return hadSelection;
+      },
+      
+      // Clear garage
+      clearGarage: () => {
+        garageData = [];
+        saveGarageData();
+        renderGarage();
+        updateJewelIndicator();
+      }
+    };
+    
+    // Initialize the modal
+    init();
+    
+    return api;
+  }
